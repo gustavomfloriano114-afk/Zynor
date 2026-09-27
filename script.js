@@ -4,18 +4,25 @@ const SUPABASE_URL =
 const SUPABASE_PUBLISHABLE_KEY =
     "sb_publishable_q87setC5fqkaVhHRWdlabw_UWNav-5H";
 
-const ZYNOR_API_URL =
+const KAEVRA_API_URL =
     "https://dazwnwkkszydyrcoajll.supabase.co/functions/v1/hyper-endpoint";
 
 const TAMANHO_MAXIMO_IMAGEM = 8 * 1024 * 1024; // 8MB
 
-const Zynor = {
-    name: "Zynor",
-    version: "1.1.0",
+// Intervalo mínimo entre envios de mensagem. Isso é só uma trava
+// simples do lado do navegador para evitar clique duplo/spam
+// acidental — NÃO substitui um rate limit de verdade no backend.
+const INTERVALO_MINIMO_ENTRE_MENSAGENS_MS = 1200;
+
+const CONVERSAS_POR_PAGINA = 20;
+
+const Kaevra = {
+    name: "Kaevra",
+    version: "1.2.0",
     model: "definido no backend",
-    storageKey: "zynor_data",
+    storageKey: "kaevra_data",
     personality: `
-Você é a Zynor, uma inteligência artificial amigável,
+Você é a Kaevra, uma inteligência artificial amigável,
 útil, direta e inteligente.
 
 Responda em português do Brasil quando o usuário falar
@@ -73,6 +80,9 @@ let selectedImage = null;
 let isSending = false;
 let authMode = "login";
 let currentAbortController = null;
+let ultimoEnvioEm = 0;
+let termoBusca = "";
+let conversasVisiveis = CONVERSAS_POR_PAGINA;
 
 const app = document.getElementById("app");
 const authScreen = document.getElementById("authScreen");
@@ -87,6 +97,7 @@ const signupName = document.getElementById("signupName");
 const signupEmail = document.getElementById("signupEmail");
 const signupPassword = document.getElementById("signupPassword");
 const passwordStrength = document.getElementById("passwordStrength");
+const acceptTerms = document.getElementById("acceptTerms");
 const signupButton = document.getElementById("signupButton");
 const signupMessage = document.getElementById("signupMessage");
 const showSignup = document.getElementById("showSignup");
@@ -107,6 +118,8 @@ const sendButton = document.getElementById("sendButton");
 const stopButton = document.getElementById("stopButton");
 const newChat = document.getElementById("newChat");
 const conversationList = document.getElementById("conversationList");
+const conversationSearch = document.getElementById("conversationSearch");
+const exportChat = document.getElementById("exportChat");
 
 const settingsBtn = document.getElementById("settingsBtn");
 const aboutBtn = document.getElementById("aboutBtn");
@@ -151,7 +164,7 @@ function esconderElemento(elemento) {
 
 function salvarLocal() {
     try {
-        localStorage.setItem(Zynor.storageKey, JSON.stringify(database));
+        localStorage.setItem(Kaevra.storageKey, JSON.stringify(database));
     } catch (erro) {
         console.warn("Não foi possível salvar localmente:", erro);
     }
@@ -159,7 +172,7 @@ function salvarLocal() {
 
 function carregarLocal() {
     try {
-        const salvo = localStorage.getItem(Zynor.storageKey);
+        const salvo = localStorage.getItem(Kaevra.storageKey);
         if (!salvo) return;
         const dados = JSON.parse(salvo);
         if (dados && Array.isArray(dados.conversations)) {
@@ -170,19 +183,30 @@ function carregarLocal() {
     }
 }
 
+// Sincronização simples entre abas: se outra aba desta mesma
+// origem alterar o localStorage, esta aba recarrega o estado.
+window.addEventListener("storage", event => {
+
+    if (event.key !== Kaevra.storageKey) return;
+    if (!currentUser) return;
+
+    carregarLocal();
+    renderizarConversas();
+    carregarConversaAtual();
+
+});
+
 
 /* =====================================================
    CONEXÃO (online / offline)
 ===================================================== */
 
 function atualizarConexao() {
-
     if (navigator.onLine) {
         esconderElemento(connectionBanner);
     } else {
         mostrarElemento(connectionBanner);
     }
-
 }
 
 window.addEventListener("online", atualizarConexao);
@@ -204,9 +228,9 @@ function showApp() {
 }
 
 function limparMensagemAuth() {
-    if (loginMessage) loginMessage.textContent = "";
+    if (loginMessage) { loginMessage.textContent = ""; loginMessage.style.color = ""; }
     if (signupMessage) signupMessage.textContent = "";
-    if (recoveryMessage) recoveryMessage.textContent = "";
+    if (recoveryMessage) { recoveryMessage.textContent = ""; recoveryMessage.style.color = ""; }
 }
 
 function mostrarErroAuth(mensagem) {
@@ -337,6 +361,10 @@ async function signUp() {
         mostrarErroAuth("A senha precisa ter pelo menos 6 caracteres.");
         return;
     }
+    if (acceptTerms && !acceptTerms.checked) {
+        mostrarErroAuth("Você precisa aceitar os Termos de Uso para continuar.");
+        return;
+    }
 
     limparMensagemAuth();
 
@@ -349,7 +377,12 @@ async function signUp() {
         const { data, error } = await supabaseClient.auth.signUp({
             email,
             password: senha,
-            options: { data: { name: nome } }
+            options: {
+                data: {
+                    name: nome,
+                    termos_aceitos_em: new Date().toISOString()
+                }
+            }
         });
 
         if (error) throw error;
@@ -429,14 +462,6 @@ async function signIn() {
 
 /* =====================================================
    RECUPERAÇÃO DE SENHA
-
-   Fluxo:
-   1. Usuário clica "Esqueci minha senha" na tela de login.
-   2. Supabase envia um e-mail com um link de redefinição.
-   3. Ao clicar no link, o Supabase abre este site novamente
-      já autenticado num modo especial e dispara o evento
-      "PASSWORD_RECOVERY" (capturado lá embaixo, no
-      onAuthStateChange). Isso mostra o formulário de nova senha.
 ===================================================== */
 
 async function solicitarRecuperacaoSenha() {
@@ -802,6 +827,46 @@ async function deletarConversa(conversaId) {
 
 
 /* =====================================================
+   EXPORTAR CONVERSA (.txt)
+===================================================== */
+
+function exportarConversaAtual() {
+
+    const conversa = obterConversaAtual();
+
+    if (!conversa || !conversa.messages || conversa.messages.length === 0) {
+        alert("Não há mensagens nesta conversa para exportar.");
+        return;
+    }
+
+    let texto = `Conversa: ${conversa.title || "Nova conversa"}\n`;
+    texto += `Exportado em: ${new Date().toLocaleString("pt-BR")}\n`;
+    texto += "=".repeat(40) + "\n\n";
+
+    conversa.messages.forEach(mensagem => {
+        const autor = mensagem.role === "user" ? "Você" : "Kaevra";
+        texto += `${autor}:\n${mensagem.content || "(imagem)"}\n\n`;
+    });
+
+    const blob = new Blob([texto], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const nomeArquivo =
+        (conversa.title || "conversa").replace(/[^\p{L}\p{N}\-_ ]/gu, "").trim() || "conversa";
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nomeArquivo + ".txt";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(url);
+
+}
+
+
+/* =====================================================
    NOVA CONVERSA
 ===================================================== */
 
@@ -835,7 +900,7 @@ function gerarId() {
     if (window.crypto && typeof window.crypto.randomUUID === "function") {
         return window.crypto.randomUUID();
     }
-    return "zynor-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+    return "kaevra-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
 }
 
 
@@ -853,7 +918,7 @@ function obterConversaAtual() {
 
 
 /* =====================================================
-   SIDEBAR — LISTA (com botão de deletar)
+   SIDEBAR — LISTA (busca + paginação + deletar)
 ===================================================== */
 
 function renderizarConversas() {
@@ -862,7 +927,25 @@ function renderizarConversas() {
 
     conversationList.innerHTML = "";
 
-    database.conversations.forEach(conversa => {
+    const termo = termoBusca.trim().toLowerCase();
+
+    const filtradas = termo
+        ? database.conversations.filter(c => (c.title || "").toLowerCase().includes(termo))
+        : database.conversations;
+
+    if (filtradas.length === 0) {
+
+        const vazio = document.createElement("div");
+        vazio.className = "no-results";
+        vazio.textContent = termo ? "Nenhuma conversa encontrada." : "Nenhuma conversa ainda.";
+        conversationList.appendChild(vazio);
+        return;
+
+    }
+
+    const visiveis = filtradas.slice(0, conversasVisiveis);
+
+    visiveis.forEach(conversa => {
 
         const item = document.createElement("button");
         item.className = "conversation-item";
@@ -909,6 +992,22 @@ function renderizarConversas() {
 
     });
 
+    if (filtradas.length > conversasVisiveis) {
+
+        const carregarMais = document.createElement("button");
+        carregarMais.className = "load-more-button";
+        carregarMais.type = "button";
+        carregarMais.textContent = `Carregar mais (${filtradas.length - conversasVisiveis} restantes)`;
+
+        carregarMais.addEventListener("click", () => {
+            conversasVisiveis += CONVERSAS_POR_PAGINA;
+            renderizarConversas();
+        });
+
+        conversationList.appendChild(carregarMais);
+
+    }
+
 }
 
 
@@ -939,7 +1038,11 @@ function carregarConversaAtual() {
         const ehUltima = indice === conversa.messages.length - 1;
         const podeRegenerar = ehUltima && mensagem.role === "assistant";
 
-        addMessage(mensagem.role, mensagem.content, false, mensagem.image || null, podeRegenerar);
+        addMessage(mensagem.role, mensagem.content, false, mensagem.image || null, {
+            indice,
+            podeRegenerar,
+            feedbackAtual: mensagem.feedback || null
+        });
 
     });
 
@@ -958,8 +1061,8 @@ function showWelcome() {
 
     chat.innerHTML = `
         <div class="welcome">
-            <div class="welcome-icon">Z</div>
-            <h2>Olá, eu sou a Zynor.</h2>
+            <div class="welcome-icon">K</div>
+            <h2>Olá, eu sou a Kaevra.</h2>
             <p>Uma IA criada para ajudar você de forma simples, rápida e prática.</p>
             <div class="suggestions">
                 <button class="suggestion" data-prompt="Explique um assunto difícil de maneira simples.">
@@ -996,11 +1099,56 @@ function showWelcome() {
 
 
 /* =====================================================
-   MENSAGEM (com botão de copiar e, quando aplicável,
-   botão de regenerar)
+   EDITAR MENSAGEM DO USUÁRIO
+
+   Trunca a conversa a partir da mensagem editada (removendo
+   ela e tudo que veio depois), recoloca o conteúdo no campo
+   de texto para o usuário ajustar e reenviar.
 ===================================================== */
 
-function addMessage(role, content, scroll = true, image = null, podeRegenerar = false) {
+function editarMensagem(indice) {
+
+    const conversa = obterConversaAtual();
+
+    if (!conversa) return;
+
+    const mensagem = conversa.messages[indice];
+
+    if (!mensagem || mensagem.role !== "user") return;
+
+    conversa.messages = conversa.messages.slice(0, indice);
+
+    carregarConversaAtual();
+
+    if (messageInput) {
+        const eraSoImagem = mensagem.content === "Analise esta imagem." && mensagem.image;
+        messageInput.value = eraSoImagem ? "" : (mensagem.content || "");
+    }
+
+    if (mensagem.image) {
+        selectedImage = mensagem.image;
+        if (previewImage) previewImage.src = selectedImage;
+        mostrarElemento(imagePreview);
+    } else {
+        limparImagem();
+    }
+
+    ajustarTextarea();
+    messageInput?.focus();
+
+    salvarLocal();
+    salvarConversaSupabase(conversa);
+
+}
+
+
+/* =====================================================
+   MENSAGEM (copiar, regenerar, editar, feedback)
+===================================================== */
+
+function addMessage(role, content, scroll = true, image = null, opcoes = {}) {
+
+    const { indice, podeRegenerar = false, feedbackAtual = null } = opcoes;
 
     if (!chat) return;
 
@@ -1026,10 +1174,10 @@ function addMessage(role, content, scroll = true, image = null, podeRegenerar = 
 
     message.appendChild(bubble);
 
-    if (role === "assistant" && content) {
+    const acoes = document.createElement("div");
+    acoes.className = "message-actions";
 
-        const acoes = document.createElement("div");
-        acoes.className = "message-actions";
+    if (role === "assistant" && content) {
 
         const copiar = document.createElement("button");
         copiar.className = "copy-button";
@@ -1063,8 +1211,68 @@ function addMessage(role, content, scroll = true, image = null, podeRegenerar = 
 
         }
 
-        bubble.appendChild(acoes);
+        if (typeof indice === "number") {
 
+            const feedbackWrap = document.createElement("div");
+            feedbackWrap.className = "feedback-buttons";
+
+            const btnUp = document.createElement("button");
+            btnUp.type = "button";
+            btnUp.textContent = "👍";
+            btnUp.title = "Resposta boa";
+            if (feedbackAtual === "up") btnUp.classList.add("active");
+
+            const btnDown = document.createElement("button");
+            btnDown.type = "button";
+            btnDown.textContent = "👎";
+            btnDown.title = "Resposta ruim";
+            if (feedbackAtual === "down") btnDown.classList.add("active");
+
+            btnUp.addEventListener("click", () => {
+                const conversaAtual = obterConversaAtual();
+                if (!conversaAtual || !conversaAtual.messages[indice]) return;
+                const novo = conversaAtual.messages[indice].feedback === "up" ? null : "up";
+                conversaAtual.messages[indice].feedback = novo;
+                btnUp.classList.toggle("active", novo === "up");
+                btnDown.classList.remove("active");
+                salvarLocal();
+                salvarConversaSupabase(conversaAtual);
+            });
+
+            btnDown.addEventListener("click", () => {
+                const conversaAtual = obterConversaAtual();
+                if (!conversaAtual || !conversaAtual.messages[indice]) return;
+                const novo = conversaAtual.messages[indice].feedback === "down" ? null : "down";
+                conversaAtual.messages[indice].feedback = novo;
+                btnDown.classList.toggle("active", novo === "down");
+                btnUp.classList.remove("active");
+                salvarLocal();
+                salvarConversaSupabase(conversaAtual);
+            });
+
+            feedbackWrap.appendChild(btnUp);
+            feedbackWrap.appendChild(btnDown);
+            acoes.appendChild(feedbackWrap);
+
+        }
+
+    }
+
+    if (role === "user" && typeof indice === "number") {
+
+        const editar = document.createElement("button");
+        editar.className = "edit-button";
+        editar.type = "button";
+        editar.textContent = "✏️ Editar";
+
+        editar.addEventListener("click", () => editarMensagem(indice));
+
+        acoes.appendChild(editar);
+
+    }
+
+    if (acoes.childNodes.length > 0) {
+        bubble.appendChild(acoes);
     }
 
     chat.appendChild(message);
@@ -1095,7 +1303,7 @@ function formatarResposta(texto) {
     seguro = seguro.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, linguagem, codigo) => {
         const indice = blocosCodigo.length;
         blocosCodigo.push(codigo.trim());
-        return "___ZYNOR_CODE_" + indice + "___";
+        return "___KAEVRA_CODE_" + indice + "___";
     });
 
     seguro = seguro
@@ -1104,7 +1312,7 @@ function formatarResposta(texto) {
             const tituloMatch = linha.match(/^(#{1,3})\s+(.*)$/);
             if (tituloMatch) {
                 const nivel = tituloMatch[1].length;
-                return `___ZYNOR_H${nivel}_START___${tituloMatch[2]}___ZYNOR_H${nivel}_END___`;
+                return `___KAEVRA_H${nivel}_START___${tituloMatch[2]}___KAEVRA_H${nivel}_END___`;
             }
             return linha;
         })
@@ -1155,14 +1363,14 @@ function formatarResposta(texto) {
     seguro = linhasProcessadas.join("\n");
 
     seguro = seguro
-        .replace(/___ZYNOR_H1_START___(.*?)___ZYNOR_H1_END___/g, "<h1>$1</h1>")
-        .replace(/___ZYNOR_H2_START___(.*?)___ZYNOR_H2_END___/g, "<h2>$1</h2>")
-        .replace(/___ZYNOR_H3_START___(.*?)___ZYNOR_H3_END___/g, "<h3>$1</h3>");
+        .replace(/___KAEVRA_H1_START___(.*?)___KAEVRA_H1_END___/g, "<h1>$1</h1>")
+        .replace(/___KAEVRA_H2_START___(.*?)___KAEVRA_H2_END___/g, "<h2>$1</h2>")
+        .replace(/___KAEVRA_H3_START___(.*?)___KAEVRA_H3_END___/g, "<h3>$1</h3>");
 
     seguro = seguro.replace(/\n/g, "<br>");
 
     blocosCodigo.forEach((codigo, indice) => {
-        const placeholder = "___ZYNOR_CODE_" + indice + "___";
+        const placeholder = "___KAEVRA_CODE_" + indice + "___";
         const bloco = `<pre><code>${codigo}</code></pre>`;
         seguro = seguro.replace(placeholder, bloco);
     });
@@ -1182,7 +1390,7 @@ function showThinking() {
     if (!chat) return;
 
     const thinking = document.createElement("div");
-    thinking.id = "zynor-thinking";
+    thinking.id = "kaevra-thinking";
     thinking.className = "thinking";
     thinking.innerHTML = `<span></span><span></span><span></span>`;
 
@@ -1195,7 +1403,7 @@ function hideThinking() {
 }
 
 function removeThinking() {
-    const thinking = document.getElementById("zynor-thinking");
+    const thinking = document.getElementById("kaevra-thinking");
     if (thinking) thinking.remove();
 }
 
@@ -1223,7 +1431,7 @@ function criarMensagensIA(texto, imagemBase64, historico) {
 
     mensagens.push({
         role: "system",
-        content: Zynor.personality
+        content: Kaevra.personality
     });
 
     const historicoLimitado = Array.isArray(historico) ? historico.slice(-8) : [];
@@ -1304,7 +1512,7 @@ async function perguntarIA(texto, imagemBase64, historico, signal) {
         throw new Error("Você precisa estar conectado.");
     }
     if (!supabaseClient) {
-        throw new Error("O sistema da Zynor não foi carregado corretamente.");
+        throw new Error("O sistema da Kaevra não foi carregado corretamente.");
     }
 
     let session = null;
@@ -1340,7 +1548,7 @@ async function perguntarIA(texto, imagemBase64, historico, signal) {
 
     try {
 
-        resposta = await fetch(ZYNOR_API_URL, {
+        resposta = await fetch(KAEVRA_API_URL, {
             method: "POST",
             mode: "cors",
             cache: "no-store",
@@ -1357,7 +1565,7 @@ async function perguntarIA(texto, imagemBase64, historico, signal) {
         if (erro.name === "AbortError") throw erro;
 
         console.error("Erro de conexão:", erro);
-        throw new Error("Não foi possível conectar à Zynor. Verifique sua internet e tente novamente.");
+        throw new Error("Não foi possível conectar à Kaevra. Verifique sua internet e tente novamente.");
 
     }
 
@@ -1367,7 +1575,7 @@ async function perguntarIA(texto, imagemBase64, historico, signal) {
         dados = await resposta.json();
     } catch (erro) {
         console.error("Resposta inválida:", erro);
-        throw new Error("O servidor da Zynor enviou uma resposta inválida.");
+        throw new Error("O servidor da Kaevra enviou uma resposta inválida.");
     }
 
     if (!resposta.ok) {
@@ -1381,10 +1589,10 @@ async function perguntarIA(texto, imagemBase64, historico, signal) {
             throw new Error("O provedor de IA informou que não há créditos disponíveis.");
         }
         if (resposta.status === 429) {
-            throw new Error("A Zynor está recebendo muitas solicitações. Aguarde alguns segundos.");
+            throw new Error("A Kaevra está recebendo muitas solicitações. Aguarde alguns segundos.");
         }
 
-        throw new Error(dados?.error || dados?.message || "Erro ao conversar com a Zynor.");
+        throw new Error(dados?.error || dados?.message || "Erro ao conversar com a Kaevra.");
 
     }
 
@@ -1399,14 +1607,13 @@ async function perguntarIA(texto, imagemBase64, historico, signal) {
     }
 
     console.error("Resposta sem conteúdo:", dados);
-    throw new Error("A Zynor recebeu uma resposta vazia.");
+    throw new Error("A Kaevra recebeu uma resposta vazia.");
 
 }
 
 
 /* =====================================================
-   ENVIAR MENSAGEM / PROCESSAR RESPOSTA (compartilhado
-   entre envio normal e regenerar)
+   ENVIAR MENSAGEM / PROCESSAR RESPOSTA
 ===================================================== */
 
 async function processarResposta(conversa) {
@@ -1437,7 +1644,10 @@ async function processarResposta(conversa) {
             created_at: new Date().toISOString()
         });
 
-        addMessage("assistant", resposta, true, null, true);
+        addMessage("assistant", resposta, true, null, {
+            indice: conversa.messages.length - 1,
+            podeRegenerar: true
+        });
 
         conversa.updated_at = new Date().toISOString();
 
@@ -1454,7 +1664,7 @@ async function processarResposta(conversa) {
         if (erro.name === "AbortError") {
             addMessage("assistant", "_Geração interrompida pelo usuário._", true);
         } else {
-            console.error("Erro Zynor:", erro);
+            console.error("Erro Kaevra:", erro);
             const mensagemErro = `Não consegui responder agora.\n\n${traduzirErroIA(erro)}`;
             addMessage("assistant", mensagemErro, true);
         }
@@ -1477,15 +1687,23 @@ async function enviarMensagem() {
 
     if (isSending) return;
 
+    const agora = Date.now();
+
+    if (agora - ultimoEnvioEm < INTERVALO_MINIMO_ENTRE_MENSAGENS_MS) {
+        return;
+    }
+
     const texto = messageInput?.value.trim() || "";
 
     if (!texto && !selectedImage) return;
 
     if (!currentUser) {
         showAuth();
-        mostrarErroAuth("Faça login para usar a Zynor.");
+        mostrarErroAuth("Faça login para usar a Kaevra.");
         return;
     }
+
+    ultimoEnvioEm = agora;
 
     let conversa = obterConversaAtual();
 
@@ -1510,7 +1728,9 @@ async function enviarMensagem() {
         created_at: new Date().toISOString()
     });
 
-    addMessage("user", mensagemTexto, true, imagem);
+    addMessage("user", mensagemTexto, true, imagem, {
+        indice: conversa.messages.length - 1
+    });
 
     if (messageInput) messageInput.value = "";
 
@@ -1595,7 +1815,7 @@ function traduzirErroIA(erro) {
 
 
 /* =====================================================
-   IMAGEM (agora com validação de tamanho)
+   IMAGEM
 ===================================================== */
 
 function prepararImagem(file) {
@@ -1701,8 +1921,8 @@ function abrirConfiguracoes() {
     fecharMenuPerfil();
 
     alert(
-        "ZYNOR IA\n\n" +
-        "Versão: " + Zynor.version +
+        "KAEVRA IA\n\n" +
+        "Versão: " + Kaevra.version +
         "\n\nStatus: " + (currentUser ? "Online" : "Offline")
     );
 
@@ -1716,8 +1936,8 @@ function abrirConfiguracoes() {
 function abrirSobre() {
 
     alert(
-        "Zynor IA\n\n" +
-        "Versão " + Zynor.version +
+        "Kaevra IA\n\n" +
+        "Versão " + Kaevra.version +
         "\n\n" +
         "Assistente de inteligência artificial."
     );
@@ -1805,6 +2025,17 @@ recoveryPassword?.addEventListener("keydown", event => {
 openSidebarButton?.addEventListener("click", abrirSidebar);
 closeSidebarButton?.addEventListener("click", fecharSidebar);
 sidebarOverlay?.addEventListener("click", fecharSidebar);
+
+conversationSearch?.addEventListener("input", event => {
+    termoBusca = event.target.value;
+    conversasVisiveis = CONVERSAS_POR_PAGINA;
+    renderizarConversas();
+});
+
+exportChat?.addEventListener("click", () => {
+    fecharSidebar();
+    exportarConversaAtual();
+});
 
 
 /* =====================================================
@@ -1948,7 +2179,7 @@ if (supabaseClient) {
    INICIALIZAÇÃO
 ===================================================== */
 
-async function iniciarZynor() {
+async function iniciarKaevra() {
 
     carregarLocal();
     atualizarConexao();
@@ -1965,10 +2196,6 @@ async function iniciarZynor() {
         return;
     }
 
-    // Se o link de recuperação de senha trouxe "type=recovery" na URL,
-    // o evento PASSWORD_RECOVERY acima cuida de mostrar a tela certa.
-    // Aqui só tratamos o caso normal de sessão já existente.
-
     try {
 
         const { data, error } = await supabaseClient.auth.getSession();
@@ -1983,7 +2210,7 @@ async function iniciarZynor() {
 
     } catch (erro) {
 
-        console.error("Erro ao iniciar Zynor:", erro);
+        console.error("Erro ao iniciar Kaevra:", erro);
         showAuth();
         mostrarErroAuth("Não foi possível conectar ao sistema de contas.");
 
@@ -1997,7 +2224,7 @@ async function iniciarZynor() {
 ===================================================== */
 
 if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", iniciarZynor);
+    document.addEventListener("DOMContentLoaded", iniciarKaevra);
 } else {
-    iniciarZynor();
+    iniciarKaevra();
 }
