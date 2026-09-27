@@ -1,51 +1,21 @@
-/* =====================================================
-   VEYRA IA 0.8
-   SCRIPT COMPLETO
-
-   Supabase Auth
-   Conversas
-   Edge Function
-   OpenRouter
-   Imagens
-   PC + Android + iPhone
-===================================================== */
-
-
-/* =====================================================
-   CONFIGURAÇÃO
-===================================================== */
-
 const SUPABASE_URL =
     "https://dazwnwkkszydyrcoajll.supabase.co";
 
 const SUPABASE_PUBLISHABLE_KEY =
     "sb_publishable_q87setC5fqkaVhHRWdlabw_UWNav-5H";
 
-
-/* =====================================================
-   EDGE FUNCTION
-===================================================== */
-
-const VEYRA_API_URL =
+const ZYNOR_API_URL =
     "https://dazwnwkkszydyrcoajll.supabase.co/functions/v1/hyper-endpoint";
 
+const TAMANHO_MAXIMO_IMAGEM = 8 * 1024 * 1024; // 8MB
 
-/* =====================================================
-   VEYRA
-===================================================== */
-
-const Veyra = {
-
-    name: "Veyra",
-
-    version: "0.8.0",
-
-    model: "openrouter/free",
-
-    storageKey: "veyra_data",
-
+const Zynor = {
+    name: "Zynor",
+    version: "1.1.0",
+    model: "definido no backend",
+    storageKey: "zynor_data",
     personality: `
-Você é a Veyra, uma inteligência artificial amigável,
+Você é a Zynor, uma inteligência artificial amigável,
 útil, direta e inteligente.
 
 Responda em português do Brasil quando o usuário falar
@@ -71,198 +41,93 @@ Não fique repetindo a mesma informação.
 
 Seu objetivo é ajudar o usuário de forma prática.
 `
-
 };
-
-
-/* =====================================================
-   SUPABASE
-===================================================== */
 
 let supabaseClient = null;
 
 try {
-
-    if (
-        window.supabase &&
-        typeof window.supabase.createClient === "function"
-    ) {
-
-        supabaseClient =
-            window.supabase.createClient(
-                SUPABASE_URL,
-                SUPABASE_PUBLISHABLE_KEY,
-                {
-                    auth: {
-                        persistSession: true,
-                        autoRefreshToken: true,
-                        detectSessionInUrl: true
-                    }
+    if (window.supabase && typeof window.supabase.createClient === "function") {
+        supabaseClient = window.supabase.createClient(
+            SUPABASE_URL,
+            SUPABASE_PUBLISHABLE_KEY,
+            {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true
                 }
-            );
-
+            }
+        );
     }
-
 } catch (erro) {
-
-    console.error(
-        "Erro ao criar cliente Supabase:",
-        erro
-    );
-
+    console.error("Erro ao criar cliente Supabase:", erro);
 }
 
-
-/* =====================================================
-   ESTADO
-===================================================== */
-
 let database = {
-
     conversations: [],
-
     currentConversation: null
-
 };
 
 let currentUser = null;
-
 let selectedImage = null;
-
 let isSending = false;
-
 let authMode = "login";
+let currentAbortController = null;
 
+const app = document.getElementById("app");
+const authScreen = document.getElementById("authScreen");
+const loginForm = document.getElementById("loginForm");
+const signupForm = document.getElementById("signupForm");
+const recoveryForm = document.getElementById("recoveryForm");
+const loginEmail = document.getElementById("loginEmail");
+const loginPassword = document.getElementById("loginPassword");
+const loginButton = document.getElementById("loginButton");
+const loginMessage = document.getElementById("loginMessage");
+const signupName = document.getElementById("signupName");
+const signupEmail = document.getElementById("signupEmail");
+const signupPassword = document.getElementById("signupPassword");
+const passwordStrength = document.getElementById("passwordStrength");
+const signupButton = document.getElementById("signupButton");
+const signupMessage = document.getElementById("signupMessage");
+const showSignup = document.getElementById("showSignup");
+const showLogin = document.getElementById("showLogin");
+const forgotPasswordLink = document.getElementById("forgotPasswordLink");
+const recoveryPassword = document.getElementById("recoveryPassword");
+const recoveryButton = document.getElementById("recoveryButton");
+const recoveryMessage = document.getElementById("recoveryMessage");
 
-/* =====================================================
-   DOM
-===================================================== */
+const sidebar = document.getElementById("sidebar");
+const sidebarOverlay = document.getElementById("sidebarOverlay");
+const openSidebarButton = document.getElementById("openSidebar");
+const closeSidebarButton = document.getElementById("closeSidebar");
 
-const app =
-    document.getElementById("app");
+const chat = document.getElementById("chat");
+const messageInput = document.getElementById("messageInput");
+const sendButton = document.getElementById("sendButton");
+const stopButton = document.getElementById("stopButton");
+const newChat = document.getElementById("newChat");
+const conversationList = document.getElementById("conversationList");
 
-const authScreen =
-    document.getElementById("authScreen");
+const settingsBtn = document.getElementById("settingsBtn");
+const aboutBtn = document.getElementById("aboutBtn");
 
-const loginForm =
-    document.getElementById("loginForm");
+const statusText = document.getElementById("statusText");
+const connectionBanner = document.getElementById("connectionBanner");
 
-const signupForm =
-    document.getElementById("signupForm");
+const imageButton = document.getElementById("imageButton");
+const imageInput = document.getElementById("imageInput");
+const imagePreview = document.getElementById("imagePreview");
+const previewImage = document.getElementById("previewImage");
+const removeImage = document.getElementById("removeImage");
 
-const loginEmail =
-    document.getElementById("loginEmail");
-
-const loginPassword =
-    document.getElementById("loginPassword");
-
-const loginButton =
-    document.getElementById("loginButton");
-
-const loginMessage =
-    document.getElementById("loginMessage");
-
-const signupName =
-    document.getElementById("signupName");
-
-const signupEmail =
-    document.getElementById("signupEmail");
-
-const signupPassword =
-    document.getElementById("signupPassword");
-
-const signupButton =
-    document.getElementById("signupButton");
-
-const signupMessage =
-    document.getElementById("signupMessage");
-
-const showSignup =
-    document.getElementById("showSignup");
-
-const showLogin =
-    document.getElementById("showLogin");
-
-
-const sidebar =
-    document.getElementById("sidebar");
-
-const sidebarOverlay =
-    document.getElementById("sidebarOverlay");
-
-const openSidebarButton =
-    document.getElementById("openSidebar");
-
-const closeSidebarButton =
-    document.getElementById("closeSidebar");
-
-
-const chat =
-    document.getElementById("chat");
-
-const messageInput =
-    document.getElementById("messageInput");
-
-const sendButton =
-    document.getElementById("sendButton");
-
-const newChat =
-    document.getElementById("newChat");
-
-const conversationList =
-    document.getElementById("conversationList");
-
-
-const settingsBtn =
-    document.getElementById("settingsBtn");
-
-const aboutBtn =
-    document.getElementById("aboutBtn");
-
-
-const statusText =
-    document.getElementById("statusText");
-
-
-const imageButton =
-    document.getElementById("imageButton");
-
-const imageInput =
-    document.getElementById("imageInput");
-
-const imagePreview =
-    document.getElementById("imagePreview");
-
-const previewImage =
-    document.getElementById("previewImage");
-
-const removeImage =
-    document.getElementById("removeImage");
-
-
-const userProfile =
-    document.getElementById("userProfile");
-
-const userProfileButton =
-    document.getElementById("userProfileButton");
-
-const profileMenu =
-    document.getElementById("profileMenu");
-
-const userAvatar =
-    document.getElementById("userAvatar");
-
-const userName =
-    document.getElementById("userName");
-
-const userEmail =
-    document.getElementById("userEmail");
-
-const profileSettings =
-    document.getElementById("profileSettings");
-
-const logoutButton =
-    document.getElementById("logoutButton");
+const userProfile = document.getElementById("userProfile");
+const userProfileButton = document.getElementById("userProfileButton");
+const profileMenu = document.getElementById("profileMenu");
+const userAvatar = document.getElementById("userAvatar");
+const userName = document.getElementById("userName");
+const userEmail = document.getElementById("userEmail");
+const profileSettings = document.getElementById("profileSettings");
+const logoutButton = document.getElementById("logoutButton");
 
 
 /* =====================================================
@@ -270,21 +135,12 @@ const logoutButton =
 ===================================================== */
 
 function mostrarElemento(elemento) {
-
-    if (!elemento) {
-        return;
-    }
-
+    if (!elemento) return;
     elemento.classList.remove("hidden");
 }
 
-
 function esconderElemento(elemento) {
-
-    if (!elemento) {
-        return;
-    }
-
+    if (!elemento) return;
     elemento.classList.add("hidden");
 }
 
@@ -294,61 +150,43 @@ function esconderElemento(elemento) {
 ===================================================== */
 
 function salvarLocal() {
-
     try {
-
-        localStorage.setItem(
-            Veyra.storageKey,
-            JSON.stringify(database)
-        );
-
+        localStorage.setItem(Zynor.storageKey, JSON.stringify(database));
     } catch (erro) {
-
-        console.warn(
-            "Não foi possível salvar localmente:",
-            erro
-        );
-
+        console.warn("Não foi possível salvar localmente:", erro);
     }
-
 }
-
 
 function carregarLocal() {
-
     try {
-
-        const salvo =
-            localStorage.getItem(
-                Veyra.storageKey
-            );
-
-        if (!salvo) {
-            return;
-        }
-
-        const dados =
-            JSON.parse(salvo);
-
-        if (
-            dados &&
-            Array.isArray(dados.conversations)
-        ) {
-
+        const salvo = localStorage.getItem(Zynor.storageKey);
+        if (!salvo) return;
+        const dados = JSON.parse(salvo);
+        if (dados && Array.isArray(dados.conversations)) {
             database = dados;
-
         }
-
     } catch (erro) {
+        console.warn("Erro ao carregar dados locais:", erro);
+    }
+}
 
-        console.warn(
-            "Erro ao carregar dados locais:",
-            erro
-        );
 
+/* =====================================================
+   CONEXÃO (online / offline)
+===================================================== */
+
+function atualizarConexao() {
+
+    if (navigator.onLine) {
+        esconderElemento(connectionBanner);
+    } else {
+        mostrarElemento(connectionBanner);
     }
 
 }
+
+window.addEventListener("online", atualizarConexao);
+window.addEventListener("offline", atualizarConexao);
 
 
 /* =====================================================
@@ -356,171 +194,120 @@ function carregarLocal() {
 ===================================================== */
 
 function showAuth() {
-
     esconderElemento(app);
-
     mostrarElemento(authScreen);
-
 }
-
 
 function showApp() {
-
     esconderElemento(authScreen);
-
     mostrarElemento(app);
-
 }
-
 
 function limparMensagemAuth() {
-
-    if (loginMessage) {
-        loginMessage.textContent = "";
-    }
-
-    if (signupMessage) {
-        signupMessage.textContent = "";
-    }
-
+    if (loginMessage) loginMessage.textContent = "";
+    if (signupMessage) signupMessage.textContent = "";
+    if (recoveryMessage) recoveryMessage.textContent = "";
 }
-
 
 function mostrarErroAuth(mensagem) {
-
     if (authMode === "login") {
-
-        if (loginMessage) {
-            loginMessage.textContent =
-                mensagem || "";
-        }
-
-    } else {
-
-        if (signupMessage) {
-            signupMessage.textContent =
-                mensagem || "";
-        }
-
+        if (loginMessage) loginMessage.textContent = mensagem || "";
+    } else if (authMode === "signup") {
+        if (signupMessage) signupMessage.textContent = mensagem || "";
+    } else if (authMode === "recovery") {
+        if (recoveryMessage) recoveryMessage.textContent = mensagem || "";
     }
-
 }
-
 
 function setAuthMode(modo) {
-
     authMode = modo;
-
     limparMensagemAuth();
 
+    esconderElemento(loginForm);
+    esconderElemento(signupForm);
+    esconderElemento(recoveryForm);
+
     if (modo === "signup") {
-
-        esconderElemento(loginForm);
-
         mostrarElemento(signupForm);
-
-        setTimeout(() => {
-
-            signupName?.focus();
-
-        }, 100);
-
+        setTimeout(() => signupName?.focus(), 100);
+    } else if (modo === "recovery") {
+        mostrarElemento(recoveryForm);
+        setTimeout(() => recoveryPassword?.focus(), 100);
     } else {
-
-        esconderElemento(signupForm);
-
         mostrarElemento(loginForm);
+        setTimeout(() => loginEmail?.focus(), 100);
+    }
+}
 
-        setTimeout(() => {
+function traduzirErroAuth(erro) {
+    const mensagem = String(erro?.message || "").toLowerCase();
 
-            loginEmail?.focus();
-
-        }, 100);
-
+    if (mensagem.includes("invalid login credentials")) {
+        return "E-mail ou senha incorretos.";
+    }
+    if (mensagem.includes("email not confirmed")) {
+        return "Confirme seu e-mail antes de entrar.";
+    }
+    if (mensagem.includes("user already registered")) {
+        return "Este e-mail já possui uma conta.";
+    }
+    if (mensagem.includes("password should be at least")) {
+        return "A senha precisa ter pelo menos 6 caracteres.";
+    }
+    if (mensagem.includes("invalid email")) {
+        return "Digite um e-mail válido.";
+    }
+    if (mensagem.includes("rate limit")) {
+        return "Muitas tentativas. Aguarde um pouco.";
+    }
+    if (mensagem.includes("same password")) {
+        return "A nova senha precisa ser diferente da anterior.";
     }
 
+    return erro?.message || "Não foi possível realizar a operação.";
 }
 
 
-function traduzirErroAuth(erro) {
+/* =====================================================
+   FORÇA DE SENHA
+===================================================== */
 
-    const mensagem =
-        String(
-            erro?.message || ""
-        ).toLowerCase();
+function avaliarForcaSenha(senha) {
+    if (!senha) return { percentual: "0%", cor: "#ff5d5d" };
 
+    let pontos = 0;
 
-    if (
-        mensagem.includes(
-            "invalid login credentials"
-        )
-    ) {
+    if (senha.length >= 6) pontos++;
+    if (senha.length >= 10) pontos++;
+    if (/[A-Z]/.test(senha) && /[a-z]/.test(senha)) pontos++;
+    if (/[0-9]/.test(senha)) pontos++;
+    if (/[^A-Za-z0-9]/.test(senha)) pontos++;
 
-        return "E-mail ou senha incorretos.";
+    const niveis = [
+        { percentual: "20%", cor: "#ff5d5d" },
+        { percentual: "40%", cor: "#ff9d4d" },
+        { percentual: "60%", cor: "#ffd24d" },
+        { percentual: "80%", cor: "#9fe04d" },
+        { percentual: "100%", cor: "#37d39b" }
+    ];
 
+    return niveis[Math.max(0, Math.min(pontos, niveis.length) - 1)];
+}
+
+function atualizarIndicadorSenha() {
+    if (!passwordStrength || !signupPassword) return;
+
+    const senha = signupPassword.value;
+
+    if (!senha) {
+        passwordStrength.style.setProperty("--strength", "0%");
+        return;
     }
 
+    const nivel = avaliarForcaSenha(senha);
 
-    if (
-        mensagem.includes(
-            "email not confirmed"
-        )
-    ) {
-
-        return "Confirme seu e-mail antes de entrar.";
-
-    }
-
-
-    if (
-        mensagem.includes(
-            "user already registered"
-        )
-    ) {
-
-        return "Este e-mail já possui uma conta.";
-
-    }
-
-
-    if (
-        mensagem.includes(
-            "password should be at least"
-        )
-    ) {
-
-        return "A senha precisa ter pelo menos 6 caracteres.";
-
-    }
-
-
-    if (
-        mensagem.includes(
-            "invalid email"
-        )
-    ) {
-
-        return "Digite um e-mail válido.";
-
-    }
-
-
-    if (
-        mensagem.includes(
-            "rate limit"
-        )
-    ) {
-
-        return "Muitas tentativas. Aguarde um pouco.";
-
-    }
-
-
-    return (
-        erro?.message ||
-        "Não foi possível realizar a operação."
-    );
-
+    passwordStrength.style.setProperty("--strength", nivel.percentual);
+    passwordStrength.style.setProperty("--strength-color", nivel.cor);
 }
 
 
@@ -529,152 +316,63 @@ function traduzirErroAuth(erro) {
 ===================================================== */
 
 async function signUp() {
-
     if (!supabaseClient) {
-
-        mostrarErroAuth(
-            "O sistema de contas não foi carregado."
-        );
-
+        mostrarErroAuth("O sistema de contas não foi carregado.");
         return;
-
     }
 
-
-    const nome =
-        signupName?.value.trim() || "";
-
-    const email =
-        signupEmail?.value.trim() || "";
-
-    const senha =
-        signupPassword?.value || "";
-
+    const nome = signupName?.value.trim() || "";
+    const email = signupEmail?.value.trim() || "";
+    const senha = signupPassword?.value || "";
 
     if (!nome) {
-
-        mostrarErroAuth(
-            "Digite seu nome."
-        );
-
+        mostrarErroAuth("Digite seu nome.");
         return;
-
     }
-
-
     if (!email) {
-
-        mostrarErroAuth(
-            "Digite seu e-mail."
-        );
-
+        mostrarErroAuth("Digite seu e-mail.");
         return;
-
     }
-
-
     if (senha.length < 6) {
-
-        mostrarErroAuth(
-            "A senha precisa ter pelo menos 6 caracteres."
-        );
-
+        mostrarErroAuth("A senha precisa ter pelo menos 6 caracteres.");
         return;
-
     }
-
 
     limparMensagemAuth();
 
-
     if (signupButton) {
-
         signupButton.disabled = true;
-
-        signupButton.textContent =
-            "Criando conta...";
-
+        signupButton.textContent = "Criando conta...";
     }
-
 
     try {
+        const { data, error } = await supabaseClient.auth.signUp({
+            email,
+            password: senha,
+            options: { data: { name: nome } }
+        });
 
-        const {
-            data,
-            error
-        } =
-            await supabaseClient.auth.signUp({
-
-                email,
-
-                password: senha,
-
-                options: {
-
-                    data: {
-
-                        name: nome
-
-                    }
-
-                }
-
-            });
-
-
-        if (error) {
-            throw error;
-        }
-
+        if (error) throw error;
 
         if (!data.session) {
-
             if (signupMessage) {
-
                 signupMessage.textContent =
                     "Conta criada! Verifique seu e-mail para confirmar a conta e depois entre.";
-
             }
-
             return;
-
         }
 
-
-        currentUser =
-            data.user;
-
-
-        await iniciarAplicacao(
-            data.user
-        );
-
-
+        currentUser = data.user;
+        await iniciarAplicacao(data.user);
     } catch (erro) {
-
-        console.error(
-            "Erro no cadastro:",
-            erro
-        );
-
-        mostrarErroAuth(
-            traduzirErroAuth(erro)
-        );
-
+        console.error("Erro no cadastro:", erro);
+        mostrarErroAuth(traduzirErroAuth(erro));
     } finally {
-
         if (signupButton) {
-
-            signupButton.disabled =
-                false;
-
-            signupButton.textContent =
-                "Criar conta";
-
+            signupButton.disabled = false;
+            signupButton.textContent = "Criar conta";
         }
-
     }
-
 }
 
 
@@ -683,111 +381,179 @@ async function signUp() {
 ===================================================== */
 
 async function signIn() {
-
     if (!supabaseClient) {
-
-        mostrarErroAuth(
-            "O sistema de contas não foi carregado."
-        );
-
+        mostrarErroAuth("O sistema de contas não foi carregado.");
         return;
-
     }
 
-
-    const email =
-        loginEmail?.value.trim() || "";
-
-    const senha =
-        loginPassword?.value || "";
-
+    const email = loginEmail?.value.trim() || "";
+    const senha = loginPassword?.value || "";
 
     if (!email) {
-
-        mostrarErroAuth(
-            "Digite seu e-mail."
-        );
-
+        mostrarErroAuth("Digite seu e-mail.");
         return;
-
     }
-
-
     if (!senha) {
-
-        mostrarErroAuth(
-            "Digite sua senha."
-        );
-
+        mostrarErroAuth("Digite sua senha.");
         return;
-
     }
-
 
     limparMensagemAuth();
 
-
     if (loginButton) {
-
-        loginButton.disabled =
-            true;
-
-        loginButton.textContent =
-            "Entrando...";
-
+        loginButton.disabled = true;
+        loginButton.textContent = "Entrando...";
     }
 
+    try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email,
+            password: senha
+        });
+
+        if (error) throw error;
+
+        currentUser = data.user;
+        await iniciarAplicacao(data.user);
+    } catch (erro) {
+        console.error("Erro no login:", erro);
+        mostrarErroAuth(traduzirErroAuth(erro));
+    } finally {
+        if (loginButton) {
+            loginButton.disabled = false;
+            loginButton.textContent = "Entrar";
+        }
+    }
+}
+
+
+/* =====================================================
+   RECUPERAÇÃO DE SENHA
+
+   Fluxo:
+   1. Usuário clica "Esqueci minha senha" na tela de login.
+   2. Supabase envia um e-mail com um link de redefinição.
+   3. Ao clicar no link, o Supabase abre este site novamente
+      já autenticado num modo especial e dispara o evento
+      "PASSWORD_RECOVERY" (capturado lá embaixo, no
+      onAuthStateChange). Isso mostra o formulário de nova senha.
+===================================================== */
+
+async function solicitarRecuperacaoSenha() {
+
+    if (!supabaseClient) {
+        mostrarErroAuth("O sistema de contas não foi carregado.");
+        return;
+    }
+
+    const email = loginEmail?.value.trim() || "";
+
+    if (!email) {
+        mostrarErroAuth("Digite seu e-mail no campo acima primeiro, depois clique em \"Esqueci minha senha\".");
+        return;
+    }
+
+    limparMensagemAuth();
+
+    if (forgotPasswordLink) {
+        forgotPasswordLink.disabled = true;
+        forgotPasswordLink.textContent = "Enviando link...";
+    }
 
     try {
 
-        const {
-            data,
-            error
-        } =
-            await supabaseClient.auth.signInWithPassword({
+        const redirectTo = window.location.origin + window.location.pathname;
 
-                email,
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+            redirectTo
+        });
 
-                password: senha
+        if (error) throw error;
 
-            });
-
-
-        if (error) {
-            throw error;
+        if (loginMessage) {
+            loginMessage.style.color = "var(--success)";
+            loginMessage.textContent =
+                "Se esse e-mail existir na nossa base, enviamos um link de redefinição. Confira sua caixa de entrada.";
         }
-
-
-        currentUser =
-            data.user;
-
-
-        await iniciarAplicacao(
-            data.user
-        );
-
 
     } catch (erro) {
 
-        console.error(
-            "Erro no login:",
-            erro
-        );
+        console.error("Erro ao solicitar recuperação:", erro);
 
-        mostrarErroAuth(
-            traduzirErroAuth(erro)
-        );
+        if (loginMessage) loginMessage.style.color = "";
+
+        mostrarErroAuth(traduzirErroAuth(erro));
 
     } finally {
 
-        if (loginButton) {
+        if (forgotPasswordLink) {
+            forgotPasswordLink.disabled = false;
+            forgotPasswordLink.textContent = "Esqueci minha senha";
+        }
 
-            loginButton.disabled =
-                false;
+    }
 
-            loginButton.textContent =
-                "Entrar";
+}
 
+async function salvarNovaSenha() {
+
+    if (!supabaseClient) {
+        mostrarErroAuth("O sistema de contas não foi carregado.");
+        return;
+    }
+
+    const novaSenha = recoveryPassword?.value || "";
+
+    if (novaSenha.length < 6) {
+        mostrarErroAuth("A nova senha precisa ter pelo menos 6 caracteres.");
+        return;
+    }
+
+    limparMensagemAuth();
+
+    if (recoveryButton) {
+        recoveryButton.disabled = true;
+        recoveryButton.textContent = "Salvando...";
+    }
+
+    try {
+
+        const { error } = await supabaseClient.auth.updateUser({
+            password: novaSenha
+        });
+
+        if (error) throw error;
+
+        if (recoveryMessage) {
+            recoveryMessage.style.color = "var(--success)";
+            recoveryMessage.textContent = "Senha atualizada! Redirecionando...";
+        }
+
+        setTimeout(async () => {
+
+            const { data } = await supabaseClient.auth.getSession();
+
+            if (data?.session?.user) {
+                await iniciarAplicacao(data.session.user);
+            } else {
+                setAuthMode("login");
+            }
+
+        }, 1200);
+
+    } catch (erro) {
+
+        console.error("Erro ao salvar nova senha:", erro);
+
+        if (recoveryMessage) recoveryMessage.style.color = "";
+
+        mostrarErroAuth(traduzirErroAuth(erro));
+
+    } finally {
+
+        if (recoveryButton) {
+            recoveryButton.disabled = false;
+            recoveryButton.textContent = "Salvar nova senha";
         }
 
     }
@@ -800,69 +566,29 @@ async function signIn() {
 ===================================================== */
 
 async function signOut() {
-
-    if (!supabaseClient) {
-        return;
-    }
-
+    if (!supabaseClient) return;
 
     try {
-
-        const {
-            error
-        } =
-            await supabaseClient.auth.signOut();
-
-
-        if (error) {
-            throw error;
-        }
-
-
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
     } catch (erro) {
-
-        console.error(
-            "Erro ao sair:",
-            erro
-        );
-
-        alert(
-            "Não foi possível sair da conta."
-        );
-
+        console.error("Erro ao sair:", erro);
+        alert("Não foi possível sair da conta.");
         return;
-
     }
 
-
     currentUser = null;
-
-    database = {
-
-        conversations: [],
-
-        currentConversation: null
-
-    };
-
+    database = { conversations: [], currentConversation: null };
     selectedImage = null;
-
     isSending = false;
 
     fecharSidebar();
-
     fecharMenuPerfil();
-
     limparImagem();
-
     limparPerfilVisual();
-
     showAuth();
-
     setAuthMode("login");
-
     atualizarStatus();
-
 }
 
 
@@ -871,223 +597,86 @@ async function signOut() {
 ===================================================== */
 
 function obterDadosPerfil(user) {
-
     if (!user) {
-
-        return {
-
-            nome: "Usuário",
-
-            email: "",
-
-            foto: ""
-
-        };
-
+        return { nome: "Usuário", email: "", foto: "" };
     }
 
-
-    const metadata =
-        user.user_metadata || {};
-
+    const metadata = user.user_metadata || {};
 
     const nome =
-
         metadata.name ||
-
         metadata.full_name ||
-
         metadata.fullName ||
-
         metadata.user_name ||
-
         metadata.preferred_username ||
-
         user.email?.split("@")[0] ||
-
         "Usuário";
 
-
-    const email =
-        user.email || "";
-
+    const email = user.email || "";
 
     const foto =
-
         metadata.avatar_url ||
-
         metadata.picture ||
-
         metadata.avatar ||
-
         "";
 
-
-    return {
-
-        nome: String(nome),
-
-        email: String(email),
-
-        foto: String(foto)
-
-    };
-
+    return { nome: String(nome), email: String(email), foto: String(foto) };
 }
-
 
 function obterInicial(nome) {
-
-    const texto =
-        String(
-            nome || "U"
-        ).trim();
-
-
-    if (!texto) {
-        return "U";
-    }
-
-
-    return texto
-        .charAt(0)
-        .toUpperCase();
-
+    const texto = String(nome || "U").trim();
+    if (!texto) return "U";
+    return texto.charAt(0).toUpperCase();
 }
 
-
-function criarAvatarElemento(
-    elemento,
-    nome,
-    foto
-) {
-
-    if (!elemento) {
-        return;
-    }
-
+function criarAvatarElemento(elemento, nome, foto) {
+    if (!elemento) return;
 
     elemento.innerHTML = "";
 
-
     if (foto) {
-
-        const img =
-            document.createElement("img");
-
-
-        img.src =
-            foto;
-
-
-        img.alt =
-            nome;
-
-
-        img.referrerPolicy =
-            "no-referrer";
-
+        const img = document.createElement("img");
+        img.src = foto;
+        img.alt = nome;
+        img.referrerPolicy = "no-referrer";
 
         img.onerror = () => {
-
             elemento.innerHTML = "";
-
-            elemento.textContent =
-                obterInicial(nome);
-
+            elemento.textContent = obterInicial(nome);
         };
 
-
         elemento.appendChild(img);
-
         return;
-
     }
 
-
-    elemento.textContent =
-        obterInicial(nome);
-
+    elemento.textContent = obterInicial(nome);
 }
-
 
 function atualizarPerfil() {
+    if (!currentUser) return;
 
-    if (!currentUser) {
-        return;
-    }
+    const perfil = obterDadosPerfil(currentUser);
 
+    if (userName) userName.textContent = perfil.nome;
+    if (userEmail) userEmail.textContent = perfil.email;
 
-    const perfil =
-        obterDadosPerfil(
-            currentUser
-        );
-
-
-    if (userName) {
-        userName.textContent =
-            perfil.nome;
-    }
-
-
-    if (userEmail) {
-        userEmail.textContent =
-            perfil.email;
-    }
-
-
-    criarAvatarElemento(
-        userAvatar,
-        perfil.nome,
-        perfil.foto
-    );
-
+    criarAvatarElemento(userAvatar, perfil.nome, perfil.foto);
 }
-
 
 function limparPerfilVisual() {
-
-    if (userName) {
-        userName.textContent =
-            "Usuário";
-    }
-
-    if (userEmail) {
-        userEmail.textContent =
-            "—";
-    }
-
-    if (userAvatar) {
-        userAvatar.innerHTML =
-            "U";
-    }
-
+    if (userName) userName.textContent = "Usuário";
+    if (userEmail) userEmail.textContent = "—";
+    if (userAvatar) userAvatar.innerHTML = "U";
 }
-
 
 function alternarMenuPerfil() {
-
-    if (!profileMenu) {
-        return;
-    }
-
-    profileMenu.classList.toggle(
-        "hidden"
-    );
-
+    if (!profileMenu) return;
+    profileMenu.classList.toggle("hidden");
 }
 
-
 function fecharMenuPerfil() {
-
-    if (!profileMenu) {
-        return;
-    }
-
-    profileMenu.classList.add(
-        "hidden"
-    );
-
+    if (!profileMenu) return;
+    profileMenu.classList.add("hidden");
 }
 
 
@@ -1096,48 +685,15 @@ function fecharMenuPerfil() {
 ===================================================== */
 
 function abrirSidebar() {
-
-    if (!sidebar) {
-        return;
-    }
-
-
-    sidebar.classList.add(
-        "open"
-    );
-
-
-    if (sidebarOverlay) {
-
-        sidebarOverlay.classList.add(
-            "visible"
-        );
-
-    }
-
+    if (!sidebar) return;
+    sidebar.classList.add("open");
+    if (sidebarOverlay) sidebarOverlay.classList.add("visible");
 }
 
-
 function fecharSidebar() {
-
-    if (!sidebar) {
-        return;
-    }
-
-
-    sidebar.classList.remove(
-        "open"
-    );
-
-
-    if (sidebarOverlay) {
-
-        sidebarOverlay.classList.remove(
-            "visible"
-        );
-
-    }
-
+    if (!sidebar) return;
+    sidebar.classList.remove("open");
+    if (sidebarOverlay) sidebarOverlay.classList.remove("visible");
 }
 
 
@@ -1146,284 +702,102 @@ function fecharSidebar() {
 ===================================================== */
 
 async function carregarConversasSupabase() {
-
-    if (
-        !currentUser ||
-        !supabaseClient
-    ) {
-        return;
-    }
-
+    if (!currentUser || !supabaseClient) return;
 
     try {
+        const { data, error } = await supabaseClient
+            .from("conversations")
+            .select("*")
+            .eq("user_id", currentUser.id)
+            .order("updated_at", { ascending: false });
 
-        const {
-            data,
-            error
-        } =
-            await supabaseClient
-                .from("conversations")
-                .select("*")
-                .eq(
-                    "user_id",
-                    currentUser.id
-                )
-                .order(
-                    "updated_at",
-                    {
-                        ascending: false
-                    }
-                );
+        if (error) throw error;
 
+        database.conversations = (data || []).map(conversa => ({
+            id: conversa.id,
+            title: conversa.title || "Nova conversa",
+            messages: Array.isArray(conversa.messages) ? conversa.messages : [],
+            created_at: conversa.created_at,
+            updated_at: conversa.updated_at
+        }));
 
-        if (error) {
-            throw error;
-        }
-
-
-        database.conversations =
-            (data || []).map(
-                conversa => ({
-
-                    id:
-                        conversa.id,
-
-                    title:
-                        conversa.title ||
-                        "Nova conversa",
-
-                    messages:
-                        Array.isArray(
-                            conversa.messages
-                        )
-                            ? conversa.messages
-                            : [],
-
-                    created_at:
-                        conversa.created_at,
-
-                    updated_at:
-                        conversa.updated_at
-
-                })
-            );
-
-
-        if (
-            database.conversations.length === 0
-        ) {
-
-            await criarNovaConversa(
-                false
-            );
-
+        if (database.conversations.length === 0) {
+            await criarNovaConversa(false);
         } else {
-
-            database.currentConversation =
-                database
-                    .conversations[0]
-                    .id;
-
+            database.currentConversation = database.conversations[0].id;
         }
-
 
         salvarLocal();
-
         renderizarConversas();
-
         carregarConversaAtual();
-
-
     } catch (erro) {
-
-        console.error(
-            "Erro ao carregar conversas:",
-            erro
-        );
-
+        console.error("Erro ao carregar conversas:", erro);
         renderizarConversas();
-
         carregarConversaAtual();
-
     }
-
 }
 
-
-async function salvarConversaSupabase(
-    conversa
-) {
-
-    if (
-        !currentUser ||
-        !conversa ||
-        !supabaseClient
-    ) {
-        return;
-    }
-
+async function salvarConversaSupabase(conversa) {
+    if (!currentUser || !conversa || !supabaseClient) return;
 
     const payload = {
-
-        id:
-            conversa.id,
-
-        user_id:
-            currentUser.id,
-
-        title:
-            conversa.title ||
-            "Nova conversa",
-
-        messages:
-            conversa.messages || [],
-
-        updated_at:
-            new Date().toISOString()
-
+        id: conversa.id,
+        user_id: currentUser.id,
+        title: conversa.title || "Nova conversa",
+        messages: conversa.messages || [],
+        updated_at: new Date().toISOString()
     };
 
-
     try {
+        const { data, error } = await supabaseClient
+            .from("conversations")
+            .upsert(payload, { onConflict: "id" })
+            .select()
+            .single();
 
-        const {
-            data,
-            error
-        } =
-            await supabaseClient
-                .from("conversations")
-                .upsert(
-                    payload,
-                    {
-                        onConflict: "id"
-                    }
-                )
-                .select()
-                .single();
+        if (error) throw error;
 
-
-        if (error) {
-            throw error;
-        }
-
-
-        if (data) {
-
-            conversa.updated_at =
-                data.updated_at;
-
-        }
-
+        if (data) conversa.updated_at = data.updated_at;
 
         salvarLocal();
-
-
     } catch (erro) {
-
-        console.error(
-            "Erro ao salvar conversa:",
-            erro
-        );
-
+        console.error("Erro ao salvar conversa:", erro);
         salvarLocal();
-
     }
-
 }
 
+async function deletarConversa(conversaId) {
+    if (!conversaId) return;
 
-async function deletarConversa(
-    conversaId
-) {
+    const conversa = database.conversations.find(item => item.id === conversaId);
+    if (!conversa) return;
 
-    if (!conversaId) {
-        return;
-    }
-
-
-    const conversa =
-        database.conversations.find(
-            item =>
-                item.id ===
-                conversaId
-        );
-
-
-    if (!conversa) {
-        return;
-    }
-
-
-    if (
-        currentUser &&
-        supabaseClient
-    ) {
-
+    if (currentUser && supabaseClient) {
         try {
+            const { error } = await supabaseClient
+                .from("conversations")
+                .delete()
+                .eq("id", conversaId)
+                .eq("user_id", currentUser.id);
 
-            const {
-                error
-            } =
-                await supabaseClient
-                    .from("conversations")
-                    .delete()
-                    .eq(
-                        "id",
-                        conversaId
-                    )
-                    .eq(
-                        "user_id",
-                        currentUser.id
-                    );
-
-
-            if (error) {
-                throw error;
-            }
-
-
+            if (error) throw error;
         } catch (erro) {
-
-            console.error(
-                "Erro ao excluir conversa:",
-                erro
-            );
-
+            console.error("Erro ao excluir conversa:", erro);
+            alert("Não foi possível excluir a conversa agora. Tente novamente.");
             return;
-
         }
-
     }
 
+    database.conversations = database.conversations.filter(item => item.id !== conversaId);
 
-    database.conversations =
-        database.conversations.filter(
-            item =>
-                item.id !==
-                conversaId
-        );
-
-
-    if (
-        database.currentConversation ===
-        conversaId
-    ) {
-
+    if (database.currentConversation === conversaId) {
         database.currentConversation =
-
-            database.conversations.length
-                ? database.conversations[0].id
-                : null;
-
+            database.conversations.length ? database.conversations[0].id : null;
     }
-
 
     salvarLocal();
-
     renderizarConversas();
-
     carregarConversaAtual();
-
 }
 
 
@@ -1431,91 +805,37 @@ async function deletarConversa(
    NOVA CONVERSA
 ===================================================== */
 
-async function criarNovaConversa(
-    salvarOnline = true
-) {
-
+async function criarNovaConversa(salvarOnline = true) {
     const conversa = {
-
-        id:
-            gerarId(),
-
-        title:
-            "Nova conversa",
-
-        messages:
-            [],
-
-        created_at:
-            new Date().toISOString(),
-
-        updated_at:
-            new Date().toISOString()
-
+        id: gerarId(),
+        title: "Nova conversa",
+        messages: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
     };
 
-
-    database.conversations.unshift(
-        conversa
-    );
-
-
-    database.currentConversation =
-        conversa.id;
-
+    database.conversations.unshift(conversa);
+    database.currentConversation = conversa.id;
 
     salvarLocal();
-
     renderizarConversas();
-
     carregarConversaAtual();
-
     fecharSidebar();
 
-
     if (salvarOnline) {
-
-        await salvarConversaSupabase(
-            conversa
-        );
-
+        await salvarConversaSupabase(conversa);
     }
-
 
     if (messageInput) {
-
-        setTimeout(
-            () => messageInput.focus(),
-            100
-        );
-
+        setTimeout(() => messageInput.focus(), 100);
     }
-
 }
 
-
 function gerarId() {
-
-    if (
-        window.crypto &&
-        typeof window.crypto.randomUUID ===
-            "function"
-    ) {
-
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
         return window.crypto.randomUUID();
-
     }
-
-
-    return (
-        "veyra-" +
-        Date.now() +
-        "-" +
-        Math.random()
-            .toString(36)
-            .slice(2, 10)
-    );
-
+    return "zynor-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
 }
 
 
@@ -1524,101 +844,70 @@ function gerarId() {
 ===================================================== */
 
 function obterConversaAtual() {
-
-    if (
-        !database.currentConversation
-    ) {
-        return null;
-    }
-
+    if (!database.currentConversation) return null;
 
     return database.conversations.find(
-
-        conversa =>
-            conversa.id ===
-            database.currentConversation
-
+        conversa => conversa.id === database.currentConversation
     ) || null;
-
 }
 
 
 /* =====================================================
-   SIDEBAR
+   SIDEBAR — LISTA (com botão de deletar)
 ===================================================== */
 
 function renderizarConversas() {
 
-    if (!conversationList) {
-        return;
-    }
-
+    if (!conversationList) return;
 
     conversationList.innerHTML = "";
 
+    database.conversations.forEach(conversa => {
 
-    database.conversations.forEach(
-        conversa => {
+        const item = document.createElement("button");
+        item.className = "conversation-item";
 
-            const item =
-                document.createElement("button");
+        if (conversa.id === database.currentConversation) {
+            item.classList.add("active");
+        }
 
+        const titulo = document.createElement("span");
+        titulo.textContent = conversa.title || "Nova conversa";
+        item.appendChild(titulo);
 
-            item.className =
-                "conversation-item";
+        const excluir = document.createElement("span");
+        excluir.className = "conversation-delete";
+        excluir.textContent = "🗑";
+        excluir.title = "Excluir conversa";
+        excluir.setAttribute("role", "button");
 
+        excluir.addEventListener("click", async event => {
 
-            if (
-                conversa.id ===
-                database.currentConversation
-            ) {
+            event.stopPropagation();
 
-                item.classList.add(
-                    "active"
-                );
+            const confirmar = confirm(
+                `Excluir a conversa "${conversa.title || "Nova conversa"}"? Essa ação não pode ser desfeita.`
+            );
 
+            if (confirmar) {
+                await deletarConversa(conversa.id);
             }
 
+        });
 
-            const titulo =
-                document.createElement("span");
+        item.appendChild(excluir);
 
+        item.addEventListener("click", () => {
+            database.currentConversation = conversa.id;
+            salvarLocal();
+            renderizarConversas();
+            carregarConversaAtual();
+            fecharSidebar();
+        });
 
-            titulo.textContent =
-                conversa.title ||
-                "Nova conversa";
+        conversationList.appendChild(item);
 
-
-            item.appendChild(
-                titulo
-            );
-
-
-            item.addEventListener(
-                "click",
-                () => {
-
-                    database.currentConversation =
-                        conversa.id;
-
-                    salvarLocal();
-
-                    renderizarConversas();
-
-                    carregarConversaAtual();
-
-                    fecharSidebar();
-
-                }
-            );
-
-
-            conversationList.appendChild(
-                item
-            );
-
-        }
-    );
+    });
 
 }
 
@@ -1629,57 +918,30 @@ function renderizarConversas() {
 
 function carregarConversaAtual() {
 
-    if (!chat) {
-        return;
-    }
+    if (!chat) return;
 
-
-    const conversa =
-        obterConversaAtual();
-
+    const conversa = obterConversaAtual();
 
     if (!conversa) {
-
         showWelcome();
-
         return;
-
     }
-
 
     chat.innerHTML = "";
 
-
-    if (
-        !conversa.messages ||
-        conversa.messages.length === 0
-    ) {
-
+    if (!conversa.messages || conversa.messages.length === 0) {
         showWelcome();
-
         return;
-
     }
 
+    conversa.messages.forEach((mensagem, indice) => {
 
-    conversa.messages.forEach(
-        mensagem => {
+        const ehUltima = indice === conversa.messages.length - 1;
+        const podeRegenerar = ehUltima && mensagem.role === "assistant";
 
-            addMessage(
+        addMessage(mensagem.role, mensagem.content, false, mensagem.image || null, podeRegenerar);
 
-                mensagem.role,
-
-                mensagem.content,
-
-                false,
-
-                mensagem.image || null
-
-            );
-
-        }
-    );
-
+    });
 
     scrollChat();
 
@@ -1692,294 +954,218 @@ function carregarConversaAtual() {
 
 function showWelcome() {
 
-    if (!chat) {
-        return;
-    }
-
+    if (!chat) return;
 
     chat.innerHTML = `
-
         <div class="welcome">
-
-            <div class="welcome-icon">
-                V
-            </div>
-
-            <h2>
-                Olá, eu sou a Veyra.
-            </h2>
-
-            <p>
-                Uma IA criada para ajudar você
-                de forma simples, rápida e prática.
-            </p>
-
+            <div class="welcome-icon">Z</div>
+            <h2>Olá, eu sou a Zynor.</h2>
+            <p>Uma IA criada para ajudar você de forma simples, rápida e prática.</p>
             <div class="suggestions">
-
-                <button
-                    class="suggestion"
-                    data-prompt="Explique um assunto difícil de maneira simples."
-                >
+                <button class="suggestion" data-prompt="Explique um assunto difícil de maneira simples.">
                     Explique algo difícil de maneira simples
                 </button>
-
-                <button
-                    class="suggestion"
-                    data-prompt="Me ajude a criar um projeto."
-                >
+                <button class="suggestion" data-prompt="Me ajude a criar um projeto.">
                     Me ajude a criar um projeto
                 </button>
-
-                <button
-                    class="suggestion"
-                    data-prompt="Me ensine alguma coisa interessante."
-                >
+                <button class="suggestion" data-prompt="Me ensine alguma coisa interessante.">
                     Me ensine alguma coisa interessante
                 </button>
-
-                <button
-                    class="suggestion"
-                    data-prompt="Me ajude a resolver um problema."
-                >
+                <button class="suggestion" data-prompt="Me ajude a resolver um problema.">
                     Me ajude a resolver um problema
                 </button>
-
             </div>
-
         </div>
-
     `;
 
+    document.querySelectorAll(".suggestion").forEach(botao => {
 
-    document
-        .querySelectorAll(".suggestion")
-        .forEach(
-            botao => {
+        botao.addEventListener("click", () => {
 
-                botao.addEventListener(
-                    "click",
-                    () => {
-
-                        if (messageInput) {
-
-                            messageInput.value =
-                                botao.dataset.prompt;
-
-                            ajustarTextarea();
-
-                            messageInput.focus();
-
-                        }
-
-                    }
-                );
-
+            if (messageInput) {
+                messageInput.value = botao.dataset.prompt;
+                ajustarTextarea();
+                messageInput.focus();
             }
-        );
+
+        });
+
+    });
 
 }
 
 
 /* =====================================================
-   MENSAGEM
+   MENSAGEM (com botão de copiar e, quando aplicável,
+   botão de regenerar)
 ===================================================== */
 
-function addMessage(
-    role,
-    content,
-    scroll = true,
-    image = null
-) {
+function addMessage(role, content, scroll = true, image = null, podeRegenerar = false) {
 
-    if (!chat) {
-        return;
-    }
+    if (!chat) return;
 
+    const message = document.createElement("div");
+    message.className = "message " + (role === "user" ? "user" : "assistant");
 
-    const message =
-        document.createElement("div");
-
-
-    message.className =
-        "message " +
-        (
-            role === "user"
-                ? "user"
-                : "assistant"
-        );
-
-
-    const bubble =
-        document.createElement("div");
-
-
-    bubble.className =
-        "message-bubble";
-
+    const bubble = document.createElement("div");
+    bubble.className = "message-bubble";
 
     if (image) {
-
-        const img =
-            document.createElement("img");
-
-
-        img.src =
-            image;
-
-
-        img.className =
-            "message-image";
-
-
-        img.alt =
-            "Imagem enviada";
-
-
+        const img = document.createElement("img");
+        img.src = image;
+        img.className = "message-image";
+        img.alt = "Imagem enviada";
         bubble.appendChild(img);
-
     }
-
 
     if (content) {
-
-        const texto =
-            document.createElement("div");
-
-
-        texto.innerHTML =
-            formatarResposta(content);
-
-
+        const texto = document.createElement("div");
+        texto.innerHTML = formatarResposta(content);
         bubble.appendChild(texto);
+    }
+
+    message.appendChild(bubble);
+
+    if (role === "assistant" && content) {
+
+        const acoes = document.createElement("div");
+        acoes.className = "message-actions";
+
+        const copiar = document.createElement("button");
+        copiar.className = "copy-button";
+        copiar.type = "button";
+        copiar.textContent = "📋 Copiar";
+
+        copiar.addEventListener("click", async () => {
+
+            try {
+                await navigator.clipboard.writeText(content);
+                copiar.textContent = "✓ Copiado";
+                setTimeout(() => { copiar.textContent = "📋 Copiar"; }, 1500);
+            } catch (erro) {
+                console.warn("Não foi possível copiar:", erro);
+            }
+
+        });
+
+        acoes.appendChild(copiar);
+
+        if (podeRegenerar) {
+
+            const regenerar = document.createElement("button");
+            regenerar.className = "regenerate-button";
+            regenerar.type = "button";
+            regenerar.textContent = "🔄 Regenerar";
+
+            regenerar.addEventListener("click", regenerarResposta);
+
+            acoes.appendChild(regenerar);
+
+        }
+
+        bubble.appendChild(acoes);
 
     }
 
+    chat.appendChild(message);
 
-    message.appendChild(
-        bubble
-    );
-
-
-    chat.appendChild(
-        message
-    );
-
-
-    if (scroll) {
-        scrollChat();
-    }
+    if (scroll) scrollChat();
 
 }
 
 
 /* =====================================================
-   FORMATAÇÃO
+   FORMATAÇÃO (Markdown básico e seguro)
 ===================================================== */
 
 function escaparHTML(texto) {
-
-    const div =
-        document.createElement("div");
-
-
-    div.textContent =
-        texto;
-
-
+    const div = document.createElement("div");
+    div.textContent = texto;
     return div.innerHTML;
-
 }
-
 
 function formatarResposta(texto) {
 
-    if (!texto) {
-        return "";
-    }
+    if (!texto) return "";
 
-
-    let seguro =
-        escaparHTML(
-            String(texto)
-        );
-
+    let seguro = escaparHTML(String(texto));
 
     const blocosCodigo = [];
 
+    seguro = seguro.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, linguagem, codigo) => {
+        const indice = blocosCodigo.length;
+        blocosCodigo.push(codigo.trim());
+        return "___ZYNOR_CODE_" + indice + "___";
+    });
 
-    seguro =
-        seguro.replace(
-            /```([\s\S]*?)```/g,
-            (
-                match,
-                codigo
-            ) => {
-
-                const indice =
-                    blocosCodigo.length;
-
-
-                blocosCodigo.push(
-                    codigo.trim()
-                );
-
-
-                return (
-                    "___VEYRA_CODE_" +
-                    indice +
-                    "___"
-                );
-
+    seguro = seguro
+        .split("\n")
+        .map(linha => {
+            const tituloMatch = linha.match(/^(#{1,3})\s+(.*)$/);
+            if (tituloMatch) {
+                const nivel = tituloMatch[1].length;
+                return `___ZYNOR_H${nivel}_START___${tituloMatch[2]}___ZYNOR_H${nivel}_END___`;
             }
-        );
+            return linha;
+        })
+        .join("\n");
 
+    seguro = seguro.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (match, txt, url) => {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${txt}</a>`;
+    });
 
-    seguro =
-        seguro.replace(
-            /\*\*(.*?)\*\*/g,
-            "<strong>$1</strong>"
-        );
+    seguro = seguro.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    seguro = seguro.replace(/`([^`]+)`/g, "<code>$1</code>");
 
+    const linhas = seguro.split("\n");
+    const linhasProcessadas = [];
+    let listaAberta = null;
 
-    seguro =
-        seguro.replace(
-            /`([^`]+)`/g,
-            "<code>$1</code>"
-        );
+    linhas.forEach(linha => {
 
+        const itemNaoOrdenado = linha.match(/^\s*[-*]\s+(.*)$/);
+        const itemOrdenado = linha.match(/^\s*\d+\.\s+(.*)$/);
 
-    seguro =
-        seguro.replace(
-            /\n/g,
-            "<br>"
-        );
-
-
-    blocosCodigo.forEach(
-        (
-            codigo,
-            indice
-        ) => {
-
-            const placeholder =
-                "___VEYRA_CODE_" +
-                indice +
-                "___";
-
-
-            const bloco =
-                `<pre><code>${codigo}</code></pre>`;
-
-
-            seguro =
-                seguro.replace(
-                    placeholder,
-                    bloco
-                );
-
+        if (itemNaoOrdenado) {
+            if (listaAberta !== "ul") {
+                if (listaAberta) linhasProcessadas.push(`</${listaAberta}>`);
+                linhasProcessadas.push("<ul>");
+                listaAberta = "ul";
+            }
+            linhasProcessadas.push(`<li>${itemNaoOrdenado[1]}</li>`);
+        } else if (itemOrdenado) {
+            if (listaAberta !== "ol") {
+                if (listaAberta) linhasProcessadas.push(`</${listaAberta}>`);
+                linhasProcessadas.push("<ol>");
+                listaAberta = "ol";
+            }
+            linhasProcessadas.push(`<li>${itemOrdenado[1]}</li>`);
+        } else {
+            if (listaAberta) {
+                linhasProcessadas.push(`</${listaAberta}>`);
+                listaAberta = null;
+            }
+            linhasProcessadas.push(linha);
         }
-    );
 
+    });
+
+    if (listaAberta) linhasProcessadas.push(`</${listaAberta}>`);
+
+    seguro = linhasProcessadas.join("\n");
+
+    seguro = seguro
+        .replace(/___ZYNOR_H1_START___(.*?)___ZYNOR_H1_END___/g, "<h1>$1</h1>")
+        .replace(/___ZYNOR_H2_START___(.*?)___ZYNOR_H2_END___/g, "<h2>$1</h2>")
+        .replace(/___ZYNOR_H3_START___(.*?)___ZYNOR_H3_END___/g, "<h3>$1</h3>");
+
+    seguro = seguro.replace(/\n/g, "<br>");
+
+    blocosCodigo.forEach((codigo, indice) => {
+        const placeholder = "___ZYNOR_CODE_" + indice + "___";
+        const bloco = `<pre><code>${codigo}</code></pre>`;
+        seguro = seguro.replace(placeholder, bloco);
+    });
 
     return seguro;
 
@@ -1991,65 +1177,26 @@ function formatarResposta(texto) {
 ===================================================== */
 
 function showThinking() {
-
     removeThinking();
 
+    if (!chat) return;
 
-    if (!chat) {
-        return;
-    }
+    const thinking = document.createElement("div");
+    thinking.id = "zynor-thinking";
+    thinking.className = "thinking";
+    thinking.innerHTML = `<span></span><span></span><span></span>`;
 
-
-    const thinking =
-        document.createElement("div");
-
-
-    thinking.id =
-        "veyra-thinking";
-
-
-    thinking.className =
-        "thinking";
-
-
-    thinking.innerHTML = `
-
-        <span></span>
-        <span></span>
-        <span></span>
-
-    `;
-
-
-    chat.appendChild(
-        thinking
-    );
-
-
+    chat.appendChild(thinking);
     scrollChat();
-
 }
-
 
 function hideThinking() {
-
     removeThinking();
-
 }
 
-
 function removeThinking() {
-
-    const thinking =
-        document.getElementById(
-            "veyra-thinking"
-        );
-
-
-    if (thinking) {
-        thinking.remove();
-    }
-
+    const thinking = document.getElementById("zynor-thinking");
+    if (thinking) thinking.remove();
 }
 
 
@@ -2058,21 +1205,11 @@ function removeThinking() {
 ===================================================== */
 
 function scrollChat() {
+    if (!chat) return;
 
-    if (!chat) {
-        return;
-    }
-
-
-    requestAnimationFrame(
-        () => {
-
-            chat.scrollTop =
-                chat.scrollHeight;
-
-        }
-    );
-
+    requestAnimationFrame(() => {
+        chat.scrollTop = chat.scrollHeight;
+    });
 }
 
 
@@ -2080,194 +1217,77 @@ function scrollChat() {
    HISTÓRICO PARA IA
 ===================================================== */
 
-function criarMensagensIA(
-    texto,
-    imagemBase64,
-    historico
-) {
+function criarMensagensIA(texto, imagemBase64, historico) {
 
     const mensagens = [];
 
-
     mensagens.push({
-
-        role:
-            "system",
-
-        content:
-            Veyra.personality
-
+        role: "system",
+        content: Zynor.personality
     });
 
+    const historicoLimitado = Array.isArray(historico) ? historico.slice(-8) : [];
 
-    const historicoLimitado =
+    historicoLimitado.forEach((mensagem, indice) => {
 
-        Array.isArray(historico)
+        if (!mensagem || !mensagem.role) return;
+        if (mensagem.role !== "user" && mensagem.role !== "assistant") return;
+        if (!mensagem.content && !mensagem.image) return;
 
-            ? historico.slice(-8)
+        const ehUltimaDoHistorico = indice === historicoLimitado.length - 1;
 
-            : [];
-
-
-    historicoLimitado.forEach(
-        mensagem => {
-
-            if (
-                !mensagem ||
-                !mensagem.role
-            ) {
-                return;
-            }
-
-
-            if (
-                mensagem.role !== "user" &&
-                mensagem.role !== "assistant"
-            ) {
-                return;
-            }
-
-
-            if (
-                !mensagem.content &&
-                !mensagem.image
-            ) {
-                return;
-            }
-
-
-            if (
-                mensagem.role === "user" &&
-                mensagem.image
-            ) {
-
-                mensagens.push({
-
-                    role:
-                        "user",
-
-                    content: [
-
-                        {
-
-                            type:
-                                "text",
-
-                            text:
-                                mensagem.content ||
-                                "Analise esta imagem."
-
-                        },
-
-                        {
-
-                            type:
-                                "image_url",
-
-                            image_url: {
-
-                                url:
-                                    mensagem.image
-
-                            }
-
-                        }
-
-                    ]
-
-                });
-
-            } else {
-
-                mensagens.push({
-
-                    role:
-                        mensagem.role,
-
-                    content:
-                        mensagem.content || ""
-
-                });
-
-            }
-
-        }
-    );
-
-
-    /*
-       A mensagem atual já está no histórico
-       quando esta função é chamada.
-
-       Portanto só adicionamos novamente caso
-       ela ainda não esteja no final.
-    */
-
-    const ultimaMensagem =
-        historicoLimitado[
-            historicoLimitado.length - 1
-        ];
-
-
-    if (
-        !ultimaMensagem ||
-        ultimaMensagem.content !== texto
-    ) {
-
-        if (imagemBase64) {
+        if (mensagem.role === "user" && mensagem.image && ehUltimaDoHistorico) {
 
             mensagens.push({
-
-                role:
-                    "user",
-
+                role: "user",
                 content: [
-
-                    {
-
-                        type:
-                            "text",
-
-                        text:
-                            texto ||
-                            "Analise esta imagem."
-
-                    },
-
-                    {
-
-                        type:
-                            "image_url",
-
-                        image_url: {
-
-                            url:
-                                imagemBase64
-
-                        }
-
-                    }
-
+                    { type: "text", text: mensagem.content || "Analise esta imagem." },
+                    { type: "image_url", image_url: { url: mensagem.image } }
                 ]
+            });
 
+        } else if (mensagem.role === "user" && mensagem.image) {
+
+            mensagens.push({
+                role: "user",
+                content: (mensagem.content || "") + " [imagem enviada anteriormente]"
             });
 
         } else {
 
             mensagens.push({
+                role: mensagem.role,
+                content: mensagem.content || ""
+            });
 
-                role:
-                    "user",
+        }
 
-                content:
-                    texto || ""
+    });
 
+    const ultimaMensagem = historicoLimitado[historicoLimitado.length - 1];
+
+    if (!ultimaMensagem || ultimaMensagem.content !== texto) {
+
+        if (imagemBase64) {
+
+            mensagens.push({
+                role: "user",
+                content: [
+                    { type: "text", text: texto || "Analise esta imagem." },
+                    { type: "image_url", image_url: { url: imagemBase64 } }
+                ]
+            });
+
+        } else {
+
+            mensagens.push({
+                role: "user",
+                content: texto || ""
             });
 
         }
 
     }
-
 
     return mensagens;
 
@@ -2278,514 +1298,271 @@ function criarMensagensIA(
    PERGUNTAR IA
 ===================================================== */
 
-async function perguntarIA(
-    texto,
-    imagemBase64,
-    historico
-) {
+async function perguntarIA(texto, imagemBase64, historico, signal) {
 
     if (!currentUser) {
-
-        throw new Error(
-            "Você precisa estar conectado."
-        );
-
+        throw new Error("Você precisa estar conectado.");
     }
-
-
     if (!supabaseClient) {
-
-        throw new Error(
-            "O sistema da Veyra não foi carregado corretamente."
-        );
-
+        throw new Error("O sistema da Zynor não foi carregado corretamente.");
     }
-
 
     let session = null;
 
-
     try {
-
-        const {
-            data,
-            error
-        } =
-            await supabaseClient.auth.getSession();
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        session =
-            data?.session || null;
-
-
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error) throw error;
+        session = data?.session || null;
     } catch (erro) {
-
-        console.error(
-            "Erro ao obter sessão:",
-            erro
-        );
-
+        console.error("Erro ao obter sessão:", erro);
     }
-
 
     if (!session?.access_token) {
 
         try {
-
-            const {
-                data,
-                error
-            } =
-                await supabaseClient.auth.refreshSession();
-
-
-            if (error) {
-                throw error;
-            }
-
-
-            session =
-                data?.session || null;
-
-
+            const { data, error } = await supabaseClient.auth.refreshSession();
+            if (error) throw error;
+            session = data?.session || null;
         } catch (erro) {
-
-            console.error(
-                "Erro ao renovar sessão:",
-                erro
-            );
-
-
-            throw new Error(
-                "Sua sessão expirou. Entre novamente na conta."
-            );
-
+            console.error("Erro ao renovar sessão:", erro);
+            throw new Error("Sua sessão expirou. Entre novamente na conta.");
         }
 
     }
 
-
     if (!session?.access_token) {
-
-        throw new Error(
-            "Sua sessão não está disponível. Entre novamente na conta."
-        );
-
+        throw new Error("Sua sessão não está disponível. Entre novamente na conta.");
     }
 
-
-    const messages =
-        criarMensagensIA(
-            texto,
-            imagemBase64,
-            historico
-        );
-
+    const messages = criarMensagensIA(texto, imagemBase64, historico);
 
     let resposta;
 
-
     try {
 
-        resposta =
-            await fetch(
-                VEYRA_API_URL,
-                {
-
-                    method:
-                        "POST",
-
-                    mode:
-                        "cors",
-
-                    cache:
-                        "no-store",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json",
-
-                        "Authorization":
-                            "Bearer " +
-                            session.access_token
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            messages
-
-                        })
-
-                }
-            );
-
+        resposta = await fetch(ZYNOR_API_URL, {
+            method: "POST",
+            mode: "cors",
+            cache: "no-store",
+            signal,
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + session.access_token
+            },
+            body: JSON.stringify({ messages })
+        });
 
     } catch (erro) {
 
-        console.error(
-            "Erro de conexão:",
-            erro
-        );
+        if (erro.name === "AbortError") throw erro;
 
-
-        throw new Error(
-            "Não foi possível conectar à Veyra. Verifique sua internet e tente novamente."
-        );
+        console.error("Erro de conexão:", erro);
+        throw new Error("Não foi possível conectar à Zynor. Verifique sua internet e tente novamente.");
 
     }
-
 
     let dados = null;
 
-
     try {
-
-        dados =
-            await resposta.json();
-
+        dados = await resposta.json();
     } catch (erro) {
-
-        console.error(
-            "Resposta inválida:",
-            erro
-        );
-
-
-        throw new Error(
-            "O servidor da Veyra enviou uma resposta inválida."
-        );
-
+        console.error("Resposta inválida:", erro);
+        throw new Error("O servidor da Zynor enviou uma resposta inválida.");
     }
-
 
     if (!resposta.ok) {
 
-        console.error(
-            "Erro da Edge Function:",
-            resposta.status,
-            dados
-        );
+        console.error("Erro da Edge Function:", resposta.status, dados);
 
-
-        if (
-            resposta.status === 401
-        ) {
-
-            throw new Error(
-                "Sua sessão não foi aceita pelo servidor. Entre novamente na conta."
-            );
-
+        if (resposta.status === 401) {
+            throw new Error("Sua sessão não foi aceita pelo servidor. Entre novamente na conta.");
+        }
+        if (resposta.status === 402) {
+            throw new Error("O provedor de IA informou que não há créditos disponíveis.");
+        }
+        if (resposta.status === 429) {
+            throw new Error("A Zynor está recebendo muitas solicitações. Aguarde alguns segundos.");
         }
 
-
-        if (
-            resposta.status === 402
-        ) {
-
-            throw new Error(
-                "A OpenRouter informou que não há créditos disponíveis."
-            );
-
-        }
-
-
-        if (
-            resposta.status === 429
-        ) {
-
-            throw new Error(
-                "A Veyra está recebendo muitas solicitações. Aguarde alguns segundos."
-            );
-
-        }
-
-
-        throw new Error(
-
-            dados?.error ||
-
-            dados?.message ||
-
-            "Erro ao conversar com a Veyra."
-
-        );
+        throw new Error(dados?.error || dados?.message || "Erro ao conversar com a Zynor.");
 
     }
-
 
     const conteudo =
-
         dados?.choices?.[0]?.message?.content ||
-
         dados?.content ||
-
         dados?.resposta ||
-
         dados?.answer;
 
-
-    if (
-        typeof conteudo === "string" &&
-        conteudo.trim()
-    ) {
-
+    if (typeof conteudo === "string" && conteudo.trim()) {
         return conteudo.trim();
-
     }
 
-
-    console.error(
-        "Resposta sem conteúdo:",
-        dados
-    );
-
-
-    throw new Error(
-        "A Veyra recebeu uma resposta vazia."
-    );
+    console.error("Resposta sem conteúdo:", dados);
+    throw new Error("A Zynor recebeu uma resposta vazia.");
 
 }
 
 
 /* =====================================================
-   ENVIAR MENSAGEM
+   ENVIAR MENSAGEM / PROCESSAR RESPOSTA (compartilhado
+   entre envio normal e regenerar)
 ===================================================== */
 
-async function enviarMensagem() {
-
-    if (isSending) {
-        return;
-    }
-
-
-    const texto =
-        messageInput?.value.trim() || "";
-
-
-    if (
-        !texto &&
-        !selectedImage
-    ) {
-        return;
-    }
-
-
-    if (!currentUser) {
-
-        showAuth();
-
-        mostrarErroAuth(
-            "Faça login para usar a Veyra."
-        );
-
-        return;
-
-    }
-
-
-    let conversa =
-        obterConversaAtual();
-
-
-    if (!conversa) {
-
-        await criarNovaConversa();
-
-        conversa =
-            obterConversaAtual();
-
-    }
-
-
-    if (!conversa) {
-        return;
-    }
-
+async function processarResposta(conversa) {
 
     isSending = true;
-
-
-    if (sendButton) {
-        sendButton.disabled =
-            true;
-    }
-
-
-    const imagem =
-        selectedImage;
-
-
-    const mensagemTexto =
-        texto ||
-        "Analise esta imagem.";
-
-
-    if (
-        conversa.messages.length === 0
-    ) {
-
-        conversa.title =
-            criarTitulo(
-                mensagemTexto
-            );
-
-    }
-
-
-    conversa.messages.push({
-
-        role:
-            "user",
-
-        content:
-            mensagemTexto,
-
-        image:
-            imagem || null,
-
-        created_at:
-            new Date().toISOString()
-
-    });
-
-
-    addMessage(
-        "user",
-        mensagemTexto,
-        true,
-        imagem
-    );
-
-
-    if (messageInput) {
-
-        messageInput.value =
-            "";
-
-    }
-
-
-    ajustarTextarea();
-
-
-    limparImagem();
-
-
-    salvarLocal();
-
-
-    await salvarConversaSupabase(
-        conversa
-    );
-
+    alternarBotaoEnviar(true);
 
     showThinking();
 
+    currentAbortController = new AbortController();
 
     try {
 
-        const resposta =
-            await perguntarIA(
-                mensagemTexto,
-                imagem,
-                conversa.messages
-            );
+        const ultimaMensagemUsuario = [...conversa.messages].reverse().find(m => m.role === "user");
 
+        const resposta = await perguntarIA(
+            ultimaMensagemUsuario?.content || "",
+            ultimaMensagemUsuario?.image || null,
+            conversa.messages,
+            currentAbortController.signal
+        );
 
         hideThinking();
 
-
         conversa.messages.push({
-
-            role:
-                "assistant",
-
-            content:
-                resposta,
-
-            created_at:
-                new Date().toISOString()
-
+            role: "assistant",
+            content: resposta,
+            created_at: new Date().toISOString()
         });
 
+        addMessage("assistant", resposta, true, null, true);
 
-        addMessage(
-            "assistant",
-            resposta,
-            true
-        );
-
-
-        conversa.updated_at =
-            new Date().toISOString();
-
+        conversa.updated_at = new Date().toISOString();
 
         salvarLocal();
 
-
-        await salvarConversaSupabase(
-            conversa
-        );
-
+        await salvarConversaSupabase(conversa);
 
         renderizarConversas();
-
 
     } catch (erro) {
 
         hideThinking();
 
-
-        console.error(
-            "Erro Veyra:",
-            erro
-        );
-
-
-        const mensagemErro =
-            `Não consegui responder agora.
-
-${traduzirErroIA(erro)}`;
-
-
-        addMessage(
-            "assistant",
-            mensagemErro,
-            true
-        );
-
+        if (erro.name === "AbortError") {
+            addMessage("assistant", "_Geração interrompida pelo usuário._", true);
+        } else {
+            console.error("Erro Zynor:", erro);
+            const mensagemErro = `Não consegui responder agora.\n\n${traduzirErroIA(erro)}`;
+            addMessage("assistant", mensagemErro, true);
+        }
 
     } finally {
 
-        isSending =
-            false;
-
-
-        if (sendButton) {
-
-            sendButton.disabled =
-                false;
-
-        }
-
+        isSending = false;
+        currentAbortController = null;
+        alternarBotaoEnviar(false);
 
         if (messageInput) {
-
-            setTimeout(
-                () => messageInput.focus(),
-                100
-            );
-
+            setTimeout(() => messageInput.focus(), 100);
         }
 
+    }
+
+}
+
+async function enviarMensagem() {
+
+    if (isSending) return;
+
+    const texto = messageInput?.value.trim() || "";
+
+    if (!texto && !selectedImage) return;
+
+    if (!currentUser) {
+        showAuth();
+        mostrarErroAuth("Faça login para usar a Zynor.");
+        return;
+    }
+
+    let conversa = obterConversaAtual();
+
+    if (!conversa) {
+        await criarNovaConversa();
+        conversa = obterConversaAtual();
+    }
+
+    if (!conversa) return;
+
+    const imagem = selectedImage;
+    const mensagemTexto = texto || "Analise esta imagem.";
+
+    if (conversa.messages.length === 0) {
+        conversa.title = criarTitulo(mensagemTexto);
+    }
+
+    conversa.messages.push({
+        role: "user",
+        content: mensagemTexto,
+        image: imagem || null,
+        created_at: new Date().toISOString()
+    });
+
+    addMessage("user", mensagemTexto, true, imagem);
+
+    if (messageInput) messageInput.value = "";
+
+    ajustarTextarea();
+    limparImagem();
+    salvarLocal();
+
+    await salvarConversaSupabase(conversa);
+
+    await processarResposta(conversa);
+
+}
+
+async function regenerarResposta() {
+
+    if (isSending) return;
+
+    const conversa = obterConversaAtual();
+
+    if (!conversa || conversa.messages.length === 0) return;
+
+    const ultima = conversa.messages[conversa.messages.length - 1];
+
+    if (ultima.role !== "assistant") return;
+
+    conversa.messages.pop();
+
+    const bolhasAssistente = chat.querySelectorAll(".message.assistant");
+    const ultimaBolha = bolhasAssistente[bolhasAssistente.length - 1];
+
+    if (ultimaBolha) ultimaBolha.remove();
+
+    await processarResposta(conversa);
+
+}
+
+function pararGeracao() {
+    if (currentAbortController) {
+        currentAbortController.abort();
+    }
+}
+
+function alternarBotaoEnviar(enviando) {
+
+    if (sendButton) sendButton.disabled = enviando;
+
+    if (enviando) {
+        esconderElemento(sendButton);
+        mostrarElemento(stopButton);
+    } else {
+        mostrarElemento(sendButton);
+        esconderElemento(stopButton);
     }
 
 }
@@ -2797,26 +1574,12 @@ ${traduzirErroIA(erro)}`;
 
 function criarTitulo(texto) {
 
-    const limpo =
-        String(texto)
-            .replace(/\s+/g, " ")
-            .trim();
+    const limpo = String(texto).replace(/\s+/g, " ").trim();
 
+    if (!limpo) return "Nova conversa";
+    if (limpo.length <= 34) return limpo;
 
-    if (!limpo) {
-        return "Nova conversa";
-    }
-
-
-    if (limpo.length <= 34) {
-        return limpo;
-    }
-
-
-    return (
-        limpo.slice(0, 34) +
-        "..."
-    );
+    return limpo.slice(0, 34) + "...";
 
 }
 
@@ -2826,233 +1589,93 @@ function criarTitulo(texto) {
 ===================================================== */
 
 function traduzirErroIA(erro) {
-
-    const mensagem =
-        String(
-            erro?.message || ""
-        );
-
-
-    return (
-        mensagem ||
-        "Ocorreu um erro desconhecido."
-    );
-
+    const mensagem = String(erro?.message || "");
+    return mensagem || "Ocorreu um erro desconhecido.";
 }
 
 
 /* =====================================================
-   IMAGEM
+   IMAGEM (agora com validação de tamanho)
 ===================================================== */
-
-/*
-   Redimensiona a imagem antes de enviar.
-
-   Isso é importante principalmente no celular:
-   fotos de iPhone/Android podem ter vários MB.
-*/
 
 function prepararImagem(file) {
 
-    if (!file) {
+    if (!file) return;
+
+    if (!file.type || !file.type.startsWith("image/")) {
+        alert("Escolha um arquivo de imagem.");
         return;
     }
 
-
-    if (
-        !file.type ||
-        !file.type.startsWith("image/")
-    ) {
-
-        alert(
-            "Escolha um arquivo de imagem."
-        );
-
+    if (file.size > TAMANHO_MAXIMO_IMAGEM) {
+        alert("Essa imagem é muito grande (máximo 8MB). Escolha uma imagem menor.");
         return;
-
     }
 
+    const reader = new FileReader();
 
-    const reader =
-        new FileReader();
+    reader.onload = event => {
 
+        const original = event.target.result;
+        const img = new Image();
 
-    reader.onload =
-        event => {
+        img.onload = () => {
 
-            const original =
-                event.target.result;
+            const maxSize = 1280;
+            let largura = img.width;
+            let altura = img.height;
 
+            if (largura > maxSize || altura > maxSize) {
+                const escala = Math.min(maxSize / largura, maxSize / altura);
+                largura = Math.round(largura * escala);
+                altura = Math.round(altura * escala);
+            }
 
-            const img =
-                new Image();
+            const canvas = document.createElement("canvas");
+            canvas.width = largura;
+            canvas.height = altura;
 
+            const contexto = canvas.getContext("2d");
 
-            img.onload =
-                () => {
+            if (!contexto) {
+                selectedImage = original;
+            } else {
+                contexto.drawImage(img, 0, 0, largura, altura);
+                selectedImage = canvas.toDataURL("image/jpeg", 0.78);
+            }
 
-                    const maxSize =
-                        1280;
+            if (previewImage) previewImage.src = selectedImage;
 
-
-                    let largura =
-                        img.width;
-
-
-                    let altura =
-                        img.height;
-
-
-                    if (
-                        largura > maxSize ||
-                        altura > maxSize
-                    ) {
-
-                        const escala =
-                            Math.min(
-                                maxSize / largura,
-                                maxSize / altura
-                            );
-
-
-                        largura =
-                            Math.round(
-                                largura * escala
-                            );
-
-
-                        altura =
-                            Math.round(
-                                altura * escala
-                            );
-
-                    }
-
-
-                    const canvas =
-                        document.createElement(
-                            "canvas"
-                        );
-
-
-                    canvas.width =
-                        largura;
-
-
-                    canvas.height =
-                        altura;
-
-
-                    const contexto =
-                        canvas.getContext(
-                            "2d"
-                        );
-
-
-                    if (!contexto) {
-
-                        selectedImage =
-                            original;
-
-                    } else {
-
-                        contexto.drawImage(
-                            img,
-                            0,
-                            0,
-                            largura,
-                            altura
-                        );
-
-
-                        selectedImage =
-                            canvas.toDataURL(
-                                "image/jpeg",
-                                0.78
-                            );
-
-                    }
-
-
-                    if (previewImage) {
-
-                        previewImage.src =
-                            selectedImage;
-
-                    }
-
-
-                    mostrarElemento(
-                        imagePreview
-                    );
-
-                };
-
-
-            img.onerror =
-                () => {
-
-                    selectedImage =
-                        original;
-
-
-                    if (previewImage) {
-
-                        previewImage.src =
-                            original;
-
-                    }
-
-
-                    mostrarElemento(
-                        imagePreview
-                    );
-
-                };
-
-
-            img.src =
-                original;
+            mostrarElemento(imagePreview);
 
         };
 
-
-    reader.onerror =
-        () => {
-
-            alert(
-                "Não foi possível carregar esta imagem."
-            );
-
+        img.onerror = () => {
+            selectedImage = original;
+            if (previewImage) previewImage.src = original;
+            mostrarElemento(imagePreview);
         };
 
+        img.src = original;
+
+    };
+
+    reader.onerror = () => {
+        alert("Não foi possível carregar esta imagem.");
+    };
 
     reader.readAsDataURL(file);
 
 }
 
-
 function limparImagem() {
 
-    selectedImage =
-        null;
+    selectedImage = null;
 
+    if (imageInput) imageInput.value = "";
+    if (previewImage) previewImage.src = "";
 
-    if (imageInput) {
-        imageInput.value =
-            "";
-    }
-
-
-    if (previewImage) {
-        previewImage.src =
-            "";
-    }
-
-
-    esconderElemento(
-        imagePreview
-    );
+    esconderElemento(imagePreview);
 
 }
 
@@ -3062,23 +1685,10 @@ function limparImagem() {
 ===================================================== */
 
 function ajustarTextarea() {
+    if (!messageInput) return;
 
-    if (!messageInput) {
-        return;
-    }
-
-
-    messageInput.style.height =
-        "auto";
-
-
-    messageInput.style.height =
-
-        Math.min(
-            messageInput.scrollHeight,
-            150
-        ) + "px";
-
+    messageInput.style.height = "auto";
+    messageInput.style.height = Math.min(messageInput.scrollHeight, 150) + "px";
 }
 
 
@@ -3091,22 +1701,9 @@ function abrirConfiguracoes() {
     fecharMenuPerfil();
 
     alert(
-
-        "VEYRA IA\n\n" +
-
-        "Versão: " +
-        Veyra.version +
-
-        "\nModelo: " +
-        Veyra.model +
-
-        "\n\nStatus: " +
-        (
-            currentUser
-                ? "Online"
-                : "Offline"
-        )
-
+        "ZYNOR IA\n\n" +
+        "Versão: " + Zynor.version +
+        "\n\nStatus: " + (currentUser ? "Online" : "Offline")
     );
 
 }
@@ -3119,16 +1716,10 @@ function abrirConfiguracoes() {
 function abrirSobre() {
 
     alert(
-
-        "Veyra IA\n\n" +
-
-        "Versão " +
-        Veyra.version +
-
+        "Zynor IA\n\n" +
+        "Versão " + Zynor.version +
         "\n\n" +
-
         "Assistente de inteligência artificial."
-
     );
 
 }
@@ -3139,24 +1730,10 @@ function abrirSobre() {
 ===================================================== */
 
 function atualizarStatus() {
+    if (!statusText) return;
 
-    if (!statusText) {
-        return;
-    }
-
-
-    statusText.textContent =
-
-        currentUser
-            ? "Online"
-            : "Offline";
-
-
-    statusText.classList.toggle(
-        "offline",
-        !currentUser
-    );
-
+    statusText.textContent = currentUser ? "Online" : "Offline";
+    statusText.classList.toggle("offline", !currentUser);
 }
 
 
@@ -3164,33 +1741,18 @@ function atualizarStatus() {
    INICIAR APLICAÇÃO
 ===================================================== */
 
-async function iniciarAplicacao(
-    user
-) {
+async function iniciarAplicacao(user) {
 
-    currentUser =
-        user;
-
+    currentUser = user;
 
     showApp();
-
-
     atualizarStatus();
-
-
     atualizarPerfil();
-
 
     await carregarConversasSupabase();
 
-
     if (messageInput) {
-
-        setTimeout(
-            () => messageInput.focus(),
-            150
-        );
-
+        setTimeout(() => messageInput.focus(), 150);
     }
 
 }
@@ -3200,294 +1762,135 @@ async function iniciarAplicacao(
    EVENTOS AUTH
 ===================================================== */
 
-showSignup?.addEventListener(
-    "click",
-    () => {
-        setAuthMode("signup");
+showSignup?.addEventListener("click", () => setAuthMode("signup"));
+showLogin?.addEventListener("click", () => setAuthMode("login"));
+
+loginButton?.addEventListener("click", signIn);
+signupButton?.addEventListener("click", signUp);
+forgotPasswordLink?.addEventListener("click", solicitarRecuperacaoSenha);
+recoveryButton?.addEventListener("click", salvarNovaSenha);
+
+signupPassword?.addEventListener("input", atualizarIndicadorSenha);
+
+[loginEmail, loginPassword].forEach(campo => {
+    campo?.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            signIn();
+        }
+    });
+});
+
+[signupName, signupEmail, signupPassword].forEach(campo => {
+    campo?.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            signUp();
+        }
+    });
+});
+
+recoveryPassword?.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+        event.preventDefault();
+        salvarNovaSenha();
     }
-);
-
-
-showLogin?.addEventListener(
-    "click",
-    () => {
-        setAuthMode("login");
-    }
-);
-
-
-loginButton?.addEventListener(
-    "click",
-    signIn
-);
-
-
-signupButton?.addEventListener(
-    "click",
-    signUp
-);
-
-
-/* =====================================================
-   ENTER LOGIN / CADASTRO
-===================================================== */
-
-[
-    loginEmail,
-    loginPassword
-].forEach(
-    campo => {
-
-        campo?.addEventListener(
-            "keydown",
-            event => {
-
-                if (
-                    event.key === "Enter"
-                ) {
-
-                    event.preventDefault();
-
-                    signIn();
-
-                }
-
-            }
-        );
-
-    }
-);
-
-
-[
-    signupName,
-    signupEmail,
-    signupPassword
-].forEach(
-    campo => {
-
-        campo?.addEventListener(
-            "keydown",
-            event => {
-
-                if (
-                    event.key === "Enter"
-                ) {
-
-                    event.preventDefault();
-
-                    signUp();
-
-                }
-
-            }
-        );
-
-    }
-);
+});
 
 
 /* =====================================================
    SIDEBAR
 ===================================================== */
 
-openSidebarButton?.addEventListener(
-    "click",
-    abrirSidebar
-);
-
-
-closeSidebarButton?.addEventListener(
-    "click",
-    fecharSidebar
-);
-
-
-sidebarOverlay?.addEventListener(
-    "click",
-    fecharSidebar
-);
+openSidebarButton?.addEventListener("click", abrirSidebar);
+closeSidebarButton?.addEventListener("click", fecharSidebar);
+sidebarOverlay?.addEventListener("click", fecharSidebar);
 
 
 /* =====================================================
    NOVA CONVERSA
 ===================================================== */
 
-newChat?.addEventListener(
-    "click",
-    () => {
-
-        criarNovaConversa();
-
-    }
-);
+newChat?.addEventListener("click", () => criarNovaConversa());
 
 
 /* =====================================================
-   ENVIAR
+   ENVIAR / PARAR
 ===================================================== */
 
-sendButton?.addEventListener(
-    "click",
-    enviarMensagem
-);
+sendButton?.addEventListener("click", enviarMensagem);
+stopButton?.addEventListener("click", pararGeracao);
 
-
-messageInput?.addEventListener(
-    "keydown",
-    event => {
-
-        if (
-            event.key === "Enter" &&
-            !event.shiftKey
-        ) {
-
-            event.preventDefault();
-
-            enviarMensagem();
-
-        }
-
+messageInput?.addEventListener("keydown", event => {
+    if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        enviarMensagem();
     }
-);
+});
 
-
-messageInput?.addEventListener(
-    "input",
-    ajustarTextarea
-);
+messageInput?.addEventListener("input", ajustarTextarea);
 
 
 /* =====================================================
    IMAGEM
 ===================================================== */
 
-imageButton?.addEventListener(
-    "click",
-    () => {
+imageButton?.addEventListener("click", () => imageInput?.click());
 
-        imageInput?.click();
+imageInput?.addEventListener("change", event => {
+    const file = event.target.files?.[0];
+    prepararImagem(file);
+});
 
-    }
-);
-
-
-imageInput?.addEventListener(
-    "change",
-    event => {
-
-        const file =
-            event.target.files?.[0];
-
-
-        prepararImagem(file);
-
-    }
-);
-
-
-removeImage?.addEventListener(
-    "click",
-    limparImagem
-);
+removeImage?.addEventListener("click", limparImagem);
 
 
 /* =====================================================
    CONFIGURAÇÕES
 ===================================================== */
 
-settingsBtn?.addEventListener(
-    "click",
-    () => {
+settingsBtn?.addEventListener("click", () => {
+    fecharSidebar();
+    abrirConfiguracoes();
+});
 
-        fecharSidebar();
-
-        abrirConfiguracoes();
-
-    }
-);
-
-
-aboutBtn?.addEventListener(
-    "click",
-    () => {
-
-        fecharSidebar();
-
-        abrirSobre();
-
-    }
-);
+aboutBtn?.addEventListener("click", () => {
+    fecharSidebar();
+    abrirSobre();
+});
 
 
 /* =====================================================
    PERFIL
 ===================================================== */
 
-userProfileButton?.addEventListener(
-    "click",
-    event => {
+userProfileButton?.addEventListener("click", event => {
+    event.stopPropagation();
+    alternarMenuPerfil();
+});
 
-        event.stopPropagation();
+profileSettings?.addEventListener("click", () => {
+    fecharMenuPerfil();
+    abrirConfiguracoes();
+});
 
-        alternarMenuPerfil();
+logoutButton?.addEventListener("click", async () => {
 
+    fecharMenuPerfil();
+
+    const confirmar = confirm("Deseja realmente sair da sua conta?");
+
+    if (confirmar) {
+        await signOut();
     }
-);
 
+});
 
-profileSettings?.addEventListener(
-    "click",
-    () => {
-
+document.addEventListener("click", event => {
+    if (userProfile && !userProfile.contains(event.target)) {
         fecharMenuPerfil();
-
-        abrirConfiguracoes();
-
     }
-);
-
-
-logoutButton?.addEventListener(
-    "click",
-    async () => {
-
-        fecharMenuPerfil();
-
-
-        const confirmar =
-            confirm(
-                "Deseja realmente sair da sua conta?"
-            );
-
-
-        if (confirmar) {
-
-            await signOut();
-
-        }
-
-    }
-);
-
-
-document.addEventListener(
-    "click",
-    event => {
-
-        if (
-            userProfile &&
-            !userProfile.contains(
-                event.target
-            )
-        ) {
-
-            fecharMenuPerfil();
-
-        }
-
-    }
-);
+});
 
 
 /* =====================================================
@@ -3496,93 +1899,47 @@ document.addEventListener(
 
 if (supabaseClient) {
 
-    supabaseClient.auth.onAuthStateChange(
-        async (
-            event,
-            session
-        ) => {
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
 
-            if (
-                event === "SIGNED_IN" &&
-                session?.user
-            ) {
+        if (event === "PASSWORD_RECOVERY") {
 
-                currentUser =
-                    session.user;
+            showAuth();
+            setAuthMode("recovery");
+            return;
 
+        }
 
-                showApp();
+        if (event === "SIGNED_IN" && session?.user) {
 
+            currentUser = session.user;
 
-                atualizarStatus();
+            showApp();
+            atualizarStatus();
+            atualizarPerfil();
 
-
-                atualizarPerfil();
-
-
-                /*
-                   Se a aplicação ainda não possui
-                   conversas carregadas, busca do Supabase.
-                */
-
-                if (
-                    database.conversations.length === 0
-                ) {
-
-                    await carregarConversasSupabase();
-
-                }
-
-            }
-
-
-            if (
-                event === "SIGNED_OUT"
-            ) {
-
-                currentUser =
-                    null;
-
-
-                database = {
-
-                    conversations: [],
-
-                    currentConversation:
-                        null
-
-                };
-
-
-                selectedImage =
-                    null;
-
-
-                isSending =
-                    false;
-
-
-                fecharSidebar();
-
-
-                fecharMenuPerfil();
-
-
-                limparImagem();
-
-
-                showAuth();
-
-
-                limparPerfilVisual();
-
-
-                atualizarStatus();
-
+            if (database.conversations.length === 0) {
+                await carregarConversasSupabase();
             }
 
         }
-    );
+
+        if (event === "SIGNED_OUT") {
+
+            currentUser = null;
+            database = { conversations: [], currentConversation: null };
+            selectedImage = null;
+            isSending = false;
+
+            fecharSidebar();
+            fecharMenuPerfil();
+            limparImagem();
+            showAuth();
+            limparPerfilVisual();
+            atualizarStatus();
+
+        }
+
+    });
 
 }
 
@@ -3591,86 +1948,44 @@ if (supabaseClient) {
    INICIALIZAÇÃO
 ===================================================== */
 
-async function iniciarVeyra() {
+async function iniciarZynor() {
 
     carregarLocal();
-
-
+    atualizarConexao();
     showAuth();
+    setAuthMode("login");
 
-
-    setAuthMode(
-        "login"
-    );
-
-
-    if (
-        !SUPABASE_PUBLISHABLE_KEY
-    ) {
-
-        mostrarErroAuth(
-            "Configure a Publishable Key do Supabase."
-        );
-
+    if (!SUPABASE_PUBLISHABLE_KEY) {
+        mostrarErroAuth("Configure a Publishable Key do Supabase.");
         return;
-
     }
-
 
     if (!supabaseClient) {
-
-        mostrarErroAuth(
-            "Não foi possível carregar o sistema do Supabase."
-        );
-
+        mostrarErroAuth("Não foi possível carregar o sistema do Supabase.");
         return;
-
     }
 
+    // Se o link de recuperação de senha trouxe "type=recovery" na URL,
+    // o evento PASSWORD_RECOVERY acima cuida de mostrar a tela certa.
+    // Aqui só tratamos o caso normal de sessão já existente.
 
     try {
 
-        const {
-            data,
-            error
-        } =
-            await supabaseClient.auth.getSession();
+        const { data, error } = await supabaseClient.auth.getSession();
 
+        if (error) throw error;
 
-        if (error) {
-            throw error;
-        }
-
-
-        if (
-            data?.session?.user
-        ) {
-
-            await iniciarAplicacao(
-                data.session.user
-            );
-
-        } else {
-
+        if (data?.session?.user && !window.location.hash.includes("type=recovery")) {
+            await iniciarAplicacao(data.session.user);
+        } else if (!window.location.hash.includes("type=recovery")) {
             showAuth();
-
         }
-
 
     } catch (erro) {
 
-        console.error(
-            "Erro ao iniciar Veyra:",
-            erro
-        );
-
-
+        console.error("Erro ao iniciar Zynor:", erro);
         showAuth();
-
-
-        mostrarErroAuth(
-            "Não foi possível conectar ao sistema de contas."
-        );
+        mostrarErroAuth("Não foi possível conectar ao sistema de contas.");
 
     }
 
@@ -3681,17 +1996,8 @@ async function iniciarVeyra() {
    START
 ===================================================== */
 
-if (
-    document.readyState === "loading"
-) {
-
-    document.addEventListener(
-        "DOMContentLoaded",
-        iniciarVeyra
-    );
-
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", iniciarZynor);
 } else {
-
-    iniciarVeyra();
-
+    iniciarZynor();
 }

@@ -2,516 +2,168 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#08090c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Zynor IA</title>
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    >
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="manifest" href="manifest.json">
 
-    <meta
-        name="theme-color"
-        content="#08090c"
-    >
-
-    <meta
-        name="apple-mobile-web-app-capable"
-        content="yes"
-    >
-
-    <meta
-        name="apple-mobile-web-app-status-bar-style"
-        content="black-translucent"
-    >
-
-    <title>Veyra IA</title>
-
-    <link
-        rel="stylesheet"
-        href="style.css"
-    >
+    <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-    <!-- =====================================================
-         TELA DE AUTENTICAÇÃO
-    ====================================================== -->
+    <div id="connectionBanner" class="connection-banner hidden">
+        Sem conexão com a internet.
+    </div>
 
-    <div
-        id="authScreen"
-        class="auth-screen"
-    >
-
+    <!-- TELA DE AUTENTICAÇÃO -->
+    <div id="authScreen" class="auth-screen">
         <div class="auth-card">
-
             <div class="auth-logo">
-
-                <div class="auth-logo-icon">
-                    V
-                </div>
-
+                <div class="auth-logo-icon">Z</div>
                 <div>
-                    <h1>Veyra IA</h1>
-
-                    <p>
-                        Seu assistente inteligente
-                    </p>
+                    <h1>Zynor</h1>
+                    <p>Seu assistente inteligente</p>
                 </div>
-
             </div>
-
 
             <!-- LOGIN -->
-
             <div id="loginForm">
-
                 <h2>Entrar</h2>
-
-                <p class="auth-description">
-                    Entre na sua conta para continuar.
-                </p>
-
-                <input
-                    id="loginEmail"
-                    type="email"
-                    placeholder="Seu e-mail"
-                    autocomplete="email"
-                    inputmode="email"
-                >
-
-                <input
-                    id="loginPassword"
-                    type="password"
-                    placeholder="Sua senha"
-                    autocomplete="current-password"
-                >
-
-                <button
-                    id="loginButton"
-                    class="auth-button"
-                    type="button"
-                >
-                    Entrar
-                </button>
-
-                <p
-                    id="loginMessage"
-                    class="auth-message"
-                ></p>
+                <p class="auth-description">Entre na sua conta para continuar.</p>
+                <input id="loginEmail" type="email" placeholder="Seu e-mail" autocomplete="email" inputmode="email">
+                <input id="loginPassword" type="password" placeholder="Sua senha" autocomplete="current-password">
+                <button id="loginButton" class="auth-button" type="button">Entrar</button>
+                <p id="loginMessage" class="auth-message"></p>
 
                 <p class="auth-switch">
-
-                    Não tem uma conta?
-
-                    <button
-                        id="showSignup"
-                        type="button"
-                    >
-                        Criar conta
-                    </button>
-
+                    <button id="forgotPasswordLink" type="button">Esqueci minha senha</button>
                 </p>
 
+                <p class="auth-switch">
+                    Não tem uma conta?
+                    <button id="showSignup" type="button">Criar conta</button>
+                </p>
             </div>
-
 
             <!-- CADASTRO -->
-
-            <div
-                id="signupForm"
-                class="hidden"
-            >
-
+            <div id="signupForm" class="hidden">
                 <h2>Criar conta</h2>
-
-                <p class="auth-description">
-                    Crie sua conta gratuita na Veyra.
-                </p>
-
-                <input
-                    id="signupName"
-                    type="text"
-                    placeholder="Seu nome"
-                    autocomplete="name"
-                >
-
-                <input
-                    id="signupEmail"
-                    type="email"
-                    placeholder="Seu e-mail"
-                    autocomplete="email"
-                    inputmode="email"
-                >
-
-                <input
-                    id="signupPassword"
-                    type="password"
-                    placeholder="Crie uma senha"
-                    autocomplete="new-password"
-                >
-
-                <button
-                    id="signupButton"
-                    class="auth-button"
-                    type="button"
-                >
-                    Criar conta
-                </button>
-
-                <p
-                    id="signupMessage"
-                    class="auth-message"
-                ></p>
-
+                <p class="auth-description">Crie sua conta gratuita na Zynor.</p>
+                <input id="signupName" type="text" placeholder="Seu nome" autocomplete="name">
+                <input id="signupEmail" type="email" placeholder="Seu e-mail" autocomplete="email" inputmode="email">
+                <input id="signupPassword" type="password" placeholder="Crie uma senha (mín. 6 caracteres)" autocomplete="new-password">
+                <div id="passwordStrength" class="password-strength"></div>
+                <button id="signupButton" class="auth-button" type="button">Criar conta</button>
+                <p id="signupMessage" class="auth-message"></p>
                 <p class="auth-switch">
-
                     Já possui uma conta?
-
-                    <button
-                        id="showLogin"
-                        type="button"
-                    >
-                        Entrar
-                    </button>
-
+                    <button id="showLogin" type="button">Entrar</button>
                 </p>
-
             </div>
 
+            <!-- RECUPERAÇÃO DE SENHA (aberta via link enviado por e-mail) -->
+            <div id="recoveryForm" class="hidden">
+                <h2>Nova senha</h2>
+                <p class="auth-description">Digite sua nova senha para continuar.</p>
+                <input id="recoveryPassword" type="password" placeholder="Nova senha (mín. 6 caracteres)" autocomplete="new-password">
+                <button id="recoveryButton" class="auth-button" type="button">Salvar nova senha</button>
+                <p id="recoveryMessage" class="auth-message"></p>
+            </div>
         </div>
-
     </div>
 
+    <!-- APLICAÇÃO -->
+    <div id="app" class="app hidden">
+        <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
-    <!-- =====================================================
-         APLICAÇÃO
-    ====================================================== -->
-
-    <div
-        id="app"
-        class="app hidden"
-    >
-
-        <!-- FUNDO DO MENU MOBILE -->
-
-        <div
-            id="sidebarOverlay"
-            class="sidebar-overlay"
-        ></div>
-
-
-        <!-- =================================================
-             SIDEBAR
-        ================================================== -->
-
-        <aside
-            id="sidebar"
-            class="sidebar"
-        >
-
+        <aside id="sidebar" class="sidebar">
             <div class="sidebar-header">
-
                 <div class="logo">
-
-                    <div class="logo-icon">
-                        V
-                    </div>
-
+                    <div class="logo-icon">Z</div>
                     <div class="logo-text">
-
-                        <strong>
-                            Veyra
-                        </strong>
-
-                        <span>
-                            IA
-                        </span>
-
+                        <strong>Zynor</strong>
+                        <span>IA</span>
                     </div>
-
                 </div>
-
-                <button
-                    id="closeSidebar"
-                    class="mobile-close"
-                    type="button"
-                    aria-label="Fechar menu"
-                >
-                    ×
-                </button>
-
+                <button id="closeSidebar" class="mobile-close" type="button" aria-label="Fechar menu">×</button>
             </div>
 
-
-            <button
-                id="newChat"
-                class="new-chat"
-                type="button"
-            >
-
-                <span>
-                    ＋
-                </span>
-
+            <button id="newChat" class="new-chat" type="button">
+                <span>＋</span>
                 Nova conversa
-
             </button>
 
-
-            <div class="sidebar-title">
-                Conversas
-            </div>
-
-
-            <div
-                id="conversationList"
-                class="conversation-list"
-            ></div>
-
+            <div class="sidebar-title">Conversas</div>
+            <div id="conversationList" class="conversation-list"></div>
 
             <div class="sidebar-bottom">
-
-                <button
-                    id="settingsBtn"
-                    class="sidebar-button"
-                    type="button"
-                >
-
-                    <span>
-                        ⚙️
-                    </span>
-
+                <button id="settingsBtn" class="sidebar-button" type="button">
+                    <span>⚙️</span>
                     Configurações
-
                 </button>
-
-
-                <button
-                    id="aboutBtn"
-                    class="sidebar-button"
-                    type="button"
-                >
-
-                    <span>
-                        ℹ️
-                    </span>
-
-                    Sobre a Veyra
-
+                <button id="aboutBtn" class="sidebar-button" type="button">
+                    <span>ℹ️</span>
+                    Sobre a Zynor
                 </button>
-
             </div>
-
         </aside>
 
-
-        <!-- =================================================
-             CONTEÚDO PRINCIPAL
-        ================================================== -->
-
         <main class="main">
-
-            <!-- HEADER -->
-
             <header class="header">
-
                 <div class="header-left">
-
-                    <button
-                        id="openSidebar"
-                        class="mobile-menu-button"
-                        type="button"
-                        aria-label="Abrir menu"
-                    >
-                        ☰
-                    </button>
-
-
+                    <button id="openSidebar" class="mobile-menu-button" type="button" aria-label="Abrir menu">☰</button>
                     <div class="header-info">
-
-                        <div class="header-title">
-                            Veyra IA
-                        </div>
-
-                        <div
-                            id="statusText"
-                            class="status"
-                        >
-                            Offline
-                        </div>
-
+                        <div class="header-title">Zynor IA</div>
+                        <div id="statusText" class="status">Offline</div>
                     </div>
-
                 </div>
 
-
-                <!-- PERFIL -->
-
-                <div
-                    id="userProfile"
-                    class="user-profile"
-                >
-
-                    <button
-                        id="userProfileButton"
-                        class="profile-button"
-                        type="button"
-                        aria-label="Abrir perfil"
-                    >
-
-                        <div
-                            id="userAvatar"
-                            class="user-avatar"
-                        >
-                            U
-                        </div>
-
+                <div id="userProfile" class="user-profile">
+                    <button id="userProfileButton" class="profile-button" type="button" aria-label="Abrir perfil">
+                        <div id="userAvatar" class="user-avatar">U</div>
                         <div class="user-data">
-
-                            <strong id="userName">
-                                Usuário
-                            </strong>
-
-                            <span id="userEmail">
-                                —
-                            </span>
-
+                            <strong id="userName">Usuário</strong>
+                            <span id="userEmail">—</span>
                         </div>
-
-                        <span class="profile-arrow">
-                            ▾
-                        </span>
-
+                        <span class="profile-arrow">▾</span>
                     </button>
 
-
-                    <div
-                        id="profileMenu"
-                        class="profile-menu hidden"
-                    >
-
-                        <button
-                            id="profileSettings"
-                            type="button"
-                        >
-                            ⚙️ Configurações
-                        </button>
-
-                        <button
-                            id="logoutButton"
-                            type="button"
-                        >
-                            🚪 Sair
-                        </button>
-
+                    <div id="profileMenu" class="profile-menu hidden">
+                        <button id="profileSettings" type="button">⚙️ Configurações</button>
+                        <button id="logoutButton" type="button">🚪 Sair</button>
                     </div>
-
                 </div>
-
             </header>
 
-
-            <!-- CHAT -->
-
-            <section
-                id="chat"
-                class="chat"
-            ></section>
-
-
-            <!-- =================================================
-                 INPUT
-            ================================================== -->
+            <section id="chat" class="chat"></section>
 
             <div class="input-area">
-
-                <div
-                    id="imagePreview"
-                    class="image-preview hidden"
-                >
-
-                    <img
-                        id="previewImage"
-                        src=""
-                        alt="Imagem selecionada"
-                    >
-
-                    <button
-                        id="removeImage"
-                        type="button"
-                        aria-label="Remover imagem"
-                    >
-                        ×
-                    </button>
-
+                <div id="imagePreview" class="image-preview hidden">
+                    <img id="previewImage" src="" alt="Imagem selecionada">
+                    <button id="removeImage" type="button" aria-label="Remover imagem">×</button>
                 </div>
-
 
                 <div class="input-box">
+                    <button id="imageButton" class="input-action" type="button" title="Enviar imagem" aria-label="Enviar imagem">📎</button>
+                    <input id="imageInput" type="file" accept="image/*" hidden>
 
-                    <button
-                        id="imageButton"
-                        class="input-action"
-                        type="button"
-                        title="Enviar imagem"
-                        aria-label="Enviar imagem"
-                    >
-                        📎
-                    </button>
+                    <textarea id="messageInput" rows="1" placeholder="Digite sua mensagem..." autocomplete="off" enterkeyhint="send"></textarea>
 
-                    <input
-                        id="imageInput"
-                        type="file"
-                        accept="image/*"
-                        hidden
-                    >
-
-
-                    <textarea
-                        id="messageInput"
-                        rows="1"
-                        placeholder="Digite sua mensagem..."
-                        autocomplete="off"
-                        enterkeyhint="send"
-                    ></textarea>
-
-
-                    <button
-                        id="sendButton"
-                        class="send-button"
-                        type="button"
-                        title="Enviar"
-                        aria-label="Enviar mensagem"
-                    >
-                        ➤
-                    </button>
-
+                    <button id="stopButton" class="stop-button hidden" type="button" title="Parar" aria-label="Parar geração">■</button>
+                    <button id="sendButton" class="send-button" type="button" title="Enviar" aria-label="Enviar mensagem">➤</button>
                 </div>
 
-
-                <div class="input-hint">
-                    A Veyra pode cometer erros. Confira informações importantes.
-                </div>
-
+                <div class="input-hint">A Zynor pode cometer erros. Confira informações importantes.</div>
             </div>
-
         </main>
-
     </div>
 
-
-    <!-- =====================================================
-         SUPABASE
-    ====================================================== -->
-
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-
-    <!-- =====================================================
-         VEYRA
-    ====================================================== -->
-
-    <script src="script.js?v=3"></script>
-
+    <script src="script.js?v=11"></script>
 </body>
 </html>
